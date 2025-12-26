@@ -468,7 +468,7 @@ BASELINE_RULES = [
     ('BANANA REPUBLIC', 'Banana Republic', 'Shopping', 'Clothing'),
     ('ATHLETA', 'Athleta', 'Shopping', 'Clothing'),
     (r'ZARA\s', 'Zara', 'Shopping', 'Clothing'),
-    (r'H.*M\.COM|HM\.COM|H.*M\s', 'H&M', 'Shopping', 'Clothing'),
+    (r'H\s*&\s*M|HM\.COM', 'H&M', 'Shopping', 'Clothing'),
     ('NIKE', 'Nike', 'Shopping', 'Clothing'),
     ('ADIDAS', 'Adidas', 'Shopping', 'Clothing'),
     ('UNDER ARMOUR', 'Under Armour', 'Shopping', 'Clothing'),
