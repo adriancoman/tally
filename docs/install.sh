@@ -130,6 +130,13 @@ main() {
 
 # Detect shell and add to appropriate config file
 add_to_path() {
+    # GitHub Actions: add to GITHUB_PATH
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+        info "Added to GITHUB_PATH for this workflow"
+        return
+    fi
+
     local shell_name
     shell_name=$(basename "${SHELL:-/bin/bash}")
 

@@ -63,12 +63,20 @@ Move-Item -Path (Join-Path $TempDir "tally.exe") -Destination (Join-Path $Instal
 # Cleanup
 Remove-Item -Recurse -Force $TempDir
 
-# Add to PATH if not already there
-$UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($UserPath -notlike "*$InstallDir*") {
-    Write-Info "Adding $InstallDir to PATH..."
-    [Environment]::SetEnvironmentVariable("Path", "$UserPath;$InstallDir", "User")
-    $env:Path = "$env:Path;$InstallDir"
+# Add to PATH
+if ($env:GITHUB_ACTIONS) {
+    # GitHub Actions: add to GITHUB_PATH
+    Write-Info "Adding to GITHUB_PATH for this workflow..."
+    $InstallDir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+    $env:Path = "$InstallDir;$env:Path"
+} else {
+    # Regular install: add to user PATH if not already there
+    $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($UserPath -notlike "*$InstallDir*") {
+        Write-Info "Adding $InstallDir to PATH..."
+        [Environment]::SetEnvironmentVariable("Path", "$UserPath;$InstallDir", "User")
+        $env:Path = "$env:Path;$InstallDir"
+    }
 }
 
 # Verify

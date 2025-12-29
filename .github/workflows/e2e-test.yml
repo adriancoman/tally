@@ -19,16 +19,12 @@ jobs:
 
       - name: Install tally (Unix)
         if: runner.os != 'Windows'
-        run: |
-          curl -fsSL https://tallyai.money/install.sh | bash -s -- --prerelease
-          echo "$HOME/.tally/bin" >> $GITHUB_PATH
+        run: curl -fsSL https://tallyai.money/install.sh | bash -s -- --prerelease
 
       - name: Install tally (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          iex "& { $(irm https://tallyai.money/install.ps1) } -Prerelease"
-          echo "$env:LOCALAPPDATA\tally" | Out-File -FilePath $env:GITHUB_PATH -Append
+        run: iex "& { $(irm https://tallyai.money/install.ps1) } -Prerelease"
 
       - name: Run smoke test (Unix)
         if: runner.os != 'Windows'
