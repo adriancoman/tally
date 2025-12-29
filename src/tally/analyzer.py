@@ -1268,9 +1268,9 @@ def write_summary_file_vue(stats, filepath, year=2025, home_locations=None, curr
 
     # Load template files
     template_dir = Path(__file__).parent
-    html_template = (template_dir / 'spending_report.html').read_text()
-    css_content = (template_dir / 'spending_report.css').read_text()
-    js_content = (template_dir / 'spending_report.js').read_text()
+    html_template = (template_dir / 'spending_report.html').read_text(encoding='utf-8')
+    css_content = (template_dir / 'spending_report.css').read_text(encoding='utf-8')
+    js_content = (template_dir / 'spending_report.js').read_text(encoding='utf-8')
 
     # Extract merchant dicts
     monthly_merchants = stats['monthly_merchants']
@@ -1587,7 +1587,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None, currency
     assets_dir = Path(__file__).parent / 'assets'
     chart_js_path = assets_dir / 'chart.min.js'
     if chart_js_path.exists():
-        chart_js_content = chart_js_path.read_text()
+        chart_js_content = chart_js_path.read_text(encoding='utf-8')
     else:
         chart_js_content = '// Chart.js not found - charts will not render'
 

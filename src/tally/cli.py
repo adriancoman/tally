@@ -1207,7 +1207,7 @@ NEXT STEPS
    tally run
 
 ================================================================================
-🤖 LET AI DO THE WORK
+LET AI DO THE WORK
 ================================================================================
 
 Why manually categorize hundreds of transactions? Let a coding agent do it!
