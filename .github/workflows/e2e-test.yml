@@ -13,11 +13,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            asset: tally-linux-x86_64.zip
+            asset: tally-linux-amd64.zip
           - os: macos-latest
-            asset: tally-darwin-arm64.zip
+            asset: tally-macos-arm64.zip
           - os: windows-latest
-            asset: tally-windows-x86_64.zip
+            asset: tally-windows-amd64.zip
     runs-on: ${{ matrix.os }}
 
     steps:
