@@ -1234,25 +1234,37 @@ Run `tally --help-config` for detailed configuration guide.
 def cmd_init(args):
     """Handle the 'init' subcommand."""
     target_dir = os.path.abspath(args.dir)
-    print(f"Initializing budget directory: {C.BOLD}{target_dir}{C.RESET}")
+    # Use relative paths for display
+    rel_target = os.path.relpath(target_dir)
+    if rel_target == '.':
+        rel_target = './'
+
+    print(f"Initializing budget directory: {C.BOLD}{rel_target}{C.RESET}")
+    print()
 
     created, skipped = init_config(target_dir)
 
-    if created:
-        print(f"{C.GREEN}✓ Created:{C.RESET}")
-        for f in created:
-            print(f"  {C.DIM}{f}{C.RESET}")
+    # Show each file with its status
+    all_files = [(f, True) for f in created] + [(f, False) for f in skipped]
+    # Sort by filename for consistent ordering
+    all_files.sort(key=lambda x: x[0])
 
-    if skipped:
-        print()
-        print(f"{C.DIM}Skipped (already exist):{C.RESET}")
-        for f in skipped:
-            print(f"  {C.DIM}{f}{C.RESET}")
+    for f, was_created in all_files:
+        if was_created:
+            print(f"  {C.GREEN}✓{C.RESET} {f}")
+        else:
+            print(f"  {C.YELLOW}→{C.RESET} {C.DIM}{f} (exists){C.RESET}")
 
     # Check if data sources are configured in settings.yaml
     import yaml
     has_data_sources = False
     settings_path = os.path.join(target_dir, 'config', 'settings.yaml')
+    # Use native path separators, with ./ prefix on Unix only
+    rel_settings = os.path.relpath(settings_path)
+    rel_data = os.path.relpath(os.path.join(target_dir, 'data')) + os.sep
+    if os.sep == '/':
+        rel_settings = './' + rel_settings
+        rel_data = './' + rel_data
     if os.path.exists(settings_path):
         try:
             with open(settings_path, 'r') as f:
@@ -1272,8 +1284,9 @@ def cmd_init(args):
             print(f"""
 {C.GREEN}✓ Config exists.{C.RESET}
 
-  {C.BOLD}1.{C.RESET} Drop your bank/credit card exports into {C.CYAN}{target_dir}/data/{C.RESET}
-  {C.BOLD}2.{C.RESET} Configure your data sources in {C.CYAN}{settings_path}{C.RESET}
+  {C.BOLD}1.{C.RESET} Drop your bank/credit card exports into {C.CYAN}{rel_data}{C.RESET}
+
+  {C.BOLD}2.{C.RESET} Configure your data sources in {C.CYAN}{rel_settings}{C.RESET}
 
 {C.DIM}See README.md for more details.{C.RESET}
 """)
@@ -1307,9 +1320,9 @@ def cmd_init(args):
         print(f"""
 {C.BOLD}Next steps:{C.RESET}
 
-  {C.BOLD}1.{C.RESET} Drop your bank/credit card exports into {C.CYAN}{target_dir}/data/{C.RESET}
+  {C.BOLD}1.{C.RESET} Drop your bank/credit card exports into {C.CYAN}{rel_data}{C.RESET}
 
-  {C.BOLD}2.{C.RESET} Configure your data sources in {C.CYAN}{settings_path}{C.RESET}
+  {C.BOLD}2.{C.RESET} Configure your data sources in {C.CYAN}{rel_settings}{C.RESET}
 
   {C.BOLD}3.{C.RESET} Open this folder in an AI agent:
 {agents_block}
