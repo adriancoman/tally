@@ -91,7 +91,12 @@ def get_platform_asset_name() -> str:
     import platform as plat
 
     system = plat.system().lower()
+    machine = plat.machine().lower()
+
     if system == 'darwin':
+        # Detect arm64 (Apple Silicon) vs x86_64 (Intel)
+        if machine in ('arm64', 'aarch64'):
+            return 'tally-macos-arm64.zip'
         return 'tally-macos-amd64.zip'
     elif system == 'linux':
         return 'tally-linux-amd64.zip'
