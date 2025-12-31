@@ -124,6 +124,26 @@
                         </div>
                     </div>
                 </div>
+                <div class="card cashflow" v-if="incomeCount > 0 || transfersCount > 0">
+                    <h2>Cash Flow</h2>
+                    <div class="amount" :class="{ positive: netCashFlow >= 0, negative: netCashFlow < 0 }">
+                        {{ netCashFlow >= 0 ? '+' : '' }}{{ formatCurrency(netCashFlow) }}
+                    </div>
+                    <div class="breakdown">
+                        <div class="breakdown-item clickable" v-if="incomeCount > 0" @click="scrollToIncome">
+                            <span class="name income-label">Income</span>
+                            <span class="value">+{{ formatCurrency(Math.abs(incomeTotal)) }}</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span class="name">Spending</span>
+                            <span class="value">-{{ formatCurrency(grandTotal) }}</span>
+                        </div>
+                        <div class="breakdown-item clickable" v-if="transfersCount > 0" @click="scrollToTransfers">
+                            <span class="name transfers-label">Transfers</span>
+                            <span class="value">-{{ formatCurrency(transfersTotal) }}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Charts Section -->
@@ -365,6 +385,138 @@
                     </div>
                 </section>
             </template>
+
+            <!-- Income Section -->
+            <section class="income-section" v-if="incomeCount > 0">
+                <div class="section-header" @click="showIncome = !showIncome">
+                    <h2>
+                        <span class="toggle">{{ showIncome ? '▼' : '▶' }}</span>
+                        Income
+                    </h2>
+                    <span class="section-total">
+                        <span class="section-ytd income-amount">+{{ formatCurrency(Math.abs(incomeTotal)) }}</span>
+                        <span class="section-pct">({{ incomeCount }} transactions)</span>
+                    </span>
+                </div>
+                <div class="section-content" v-show="showIncome">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th>Category</th>
+                                <th>Tags</th>
+                                <th>Count</th>
+                                <th class="money">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template v-for="(group, idx) in groupedIncome" :key="idx">
+                                <tr class="merchant-row" @click="expandedIncome.has(idx) ? expandedIncome.delete(idx) : expandedIncome.add(idx)">
+                                    <td>
+                                        <span class="expand-arrow">{{ expandedIncome.has(idx) ? '▼' : '▶' }}</span>
+                                        {{ group.merchant }}
+                                    </td>
+                                    <td class="category">{{ group.subcategory }}</td>
+                                    <td class="tags-cell">
+                                        <span v-for="tag in (group.tags || [])"
+                                              :key="tag"
+                                              class="tag-badge"
+                                              @click.stop="addFilter(tag, 'tag')">{{ tag }}</span>
+                                    </td>
+                                    <td>{{ group.count }}</td>
+                                    <td class="money income-amount">+{{ formatCurrency(Math.abs(group.total)) }}</td>
+                                </tr>
+                                <tr v-for="txn in group.transactions"
+                                    :key="txn.id"
+                                    class="txn-row"
+                                    :class="{ hidden: !expandedIncome.has(idx) }">
+                                    <td colspan="5">
+                                        <div class="txn-detail">
+                                            <span class="txn-date">{{ formatDate(txn.date) }}</span>
+                                            <span class="txn-source" :class="txn.source.toLowerCase()">{{ txn.source }}</span>
+                                            <span class="txn-desc">{{ txn.description }}</span>
+                                            <span class="txn-amount income-amount">+{{ formatCurrency(Math.abs(txn.amount)) }}</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="3">Total</td>
+                                <td>{{ incomeCount }}</td>
+                                <td class="money income-amount">+{{ formatCurrency(Math.abs(incomeTotal)) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Transfers Section -->
+            <section class="transfers-section" v-if="transfersCount > 0">
+                <div class="section-header" @click="showTransfers = !showTransfers">
+                    <h2>
+                        <span class="toggle">{{ showTransfers ? '▼' : '▶' }}</span>
+                        Transfers
+                    </h2>
+                    <span class="section-total">
+                        <span class="section-ytd">{{ formatCurrency(transfersTotal) }}</span>
+                        <span class="section-pct">({{ transfersCount }} transactions)</span>
+                    </span>
+                </div>
+                <div class="section-content" v-show="showTransfers">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Destination</th>
+                                <th>Category</th>
+                                <th>Tags</th>
+                                <th>Count</th>
+                                <th class="money">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template v-for="(group, idx) in groupedTransfers" :key="idx">
+                                <tr class="merchant-row" @click="expandedTransfers.has(idx) ? expandedTransfers.delete(idx) : expandedTransfers.add(idx)">
+                                    <td>
+                                        <span class="expand-arrow">{{ expandedTransfers.has(idx) ? '▼' : '▶' }}</span>
+                                        {{ group.merchant }}
+                                    </td>
+                                    <td class="category">{{ group.subcategory }}</td>
+                                    <td class="tags-cell">
+                                        <span v-for="tag in (group.tags || [])"
+                                              :key="tag"
+                                              class="tag-badge"
+                                              @click.stop="addFilter(tag, 'tag')">{{ tag }}</span>
+                                    </td>
+                                    <td>{{ group.count }}</td>
+                                    <td class="money">{{ formatCurrency(group.total) }}</td>
+                                </tr>
+                                <tr v-for="txn in group.transactions"
+                                    :key="txn.id"
+                                    class="txn-row"
+                                    :class="{ hidden: !expandedTransfers.has(idx) }">
+                                    <td colspan="5">
+                                        <div class="txn-detail">
+                                            <span class="txn-date">{{ formatDate(txn.date) }}</span>
+                                            <span class="txn-source" :class="txn.source.toLowerCase()">{{ txn.source }}</span>
+                                            <span class="txn-desc">{{ txn.description }}</span>
+                                            <span class="txn-amount">{{ formatCurrency(txn.amount) }}</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="3">Total</td>
+                                <td>{{ transfersCount }}</td>
+                                <td class="money">{{ formatCurrency(transfersTotal) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
 
             <!-- Footer -->
             <footer>

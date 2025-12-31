@@ -24,6 +24,7 @@ createApp({
         const chartsCollapsed = ref(false);
         const helpCollapsed = ref(true);
         const currentView = ref('category'); // 'category' or 'pattern'
+        const showExcluded = ref(false); // Toggle for excluded transactions (income/credits)
 
         // Chart refs
         const monthlyChart = ref(null);
@@ -193,6 +194,87 @@ createApp({
         const uncategorizedTotal = computed(() => {
             return sectionTotals.value.unknown || 0;
         });
+
+        // Excluded transactions split into Income and Transfers
+        const excludedTransactions = computed(() => {
+            return spendingData.value.excludedTransactions || [];
+        });
+
+        // Income transactions (credits/deposits)
+        const incomeTransactions = computed(() => {
+            return excludedTransactions.value.filter(t => t.excluded_reason === 'income');
+        });
+        const incomeTotal = computed(() => {
+            return incomeTransactions.value.reduce((sum, t) => sum + t.amount, 0);
+        });
+        const incomeCount = computed(() => incomeTransactions.value.length);
+
+        // Transfer transactions (CC payments, P2P, etc.)
+        const transferTransactions = computed(() => {
+            return excludedTransactions.value.filter(t => t.excluded_reason === 'transfer');
+        });
+        const transfersTotal = computed(() => {
+            return transferTransactions.value.reduce((sum, t) => sum + t.amount, 0);
+        });
+        const transfersCount = computed(() => transferTransactions.value.length);
+
+        // Net cash flow
+        const netCashFlow = computed(() => {
+            return Math.abs(incomeTotal.value) - grandTotal.value - transfersTotal.value;
+        });
+
+        // Group transactions by merchant helper
+        function groupByMerchant(transactions) {
+            const groups = {};
+            for (const txn of transactions) {
+                const key = txn.merchant;
+                if (!groups[key]) {
+                    groups[key] = {
+                        merchant: txn.merchant,
+                        category: txn.category,
+                        subcategory: txn.subcategory,
+                        tags: txn.tags || [],
+                        transactions: [],
+                        total: 0,
+                        count: 0
+                    };
+                }
+                groups[key].transactions.push(txn);
+                groups[key].total += txn.amount;
+                groups[key].count++;
+            }
+            return Object.values(groups).sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+        }
+
+        const groupedIncome = computed(() => groupByMerchant(incomeTransactions.value));
+        const groupedTransfers = computed(() => groupByMerchant(transferTransactions.value));
+
+        const expandedIncome = reactive(new Set());
+        const expandedTransfers = reactive(new Set());
+        const showIncome = ref(false);
+        const showTransfers = ref(false);
+
+        // Scroll to income section
+        function scrollToIncome() {
+            showIncome.value = true;
+            nextTick(() => {
+                const section = document.querySelector('.income-section');
+                if (section) {
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        }
+
+        // Scroll to transfers section
+        function scrollToTransfers() {
+            showTransfers.value = true;
+            nextTick(() => {
+                const section = document.querySelector('.transfers-section');
+                if (section) {
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        }
 
         // Number of months in filter (for monthly averages)
         const numFilteredMonths = computed(() => {
@@ -855,7 +937,7 @@ createApp({
             // State
             activeFilters, expandedMerchants, collapsedSections, searchQuery,
             showAutocomplete, autocompleteIndex, isScrolled, isDarkTheme, chartsCollapsed, helpCollapsed,
-            currentView,
+            currentView, showIncome, showTransfers,
             // Refs
             monthlyChart, categoryPieChart, categoryByMonthChart,
             // Computed
@@ -863,12 +945,16 @@ createApp({
             visibleSections, filteredCategoryView, sectionTotals, grandTotal, monthlyBudget, nonRecurringTotal,
             monthlyRecurringAvg, variableMonthlyAvg, uncategorizedTotal,
             numFilteredMonths, filteredAutocomplete, availableMonths,
+            // Cash flow
+            incomeTotal, incomeCount, groupedIncome, expandedIncome,
+            transfersTotal, transfersCount, groupedTransfers, expandedTransfers,
+            netCashFlow,
             // Methods
             addFilter, removeFilter, toggleFilterMode, clearFilters, addMonthFilter,
             toggleExpand, toggleSection, sortedMerchants,
             formatCurrency, formatDate, formatMonthLabel, formatPct, filterTypeChar, getLocationClass,
             onSearchInput, onSearchKeydown, selectAutocompleteItem,
-            toggleTheme, setView
+            toggleTheme, setView, scrollToIncome, scrollToTransfers
         };
     }
 }).mount('#app');

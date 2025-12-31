@@ -874,11 +874,14 @@ class TestAccountType:
             from tally.analyzer import parse_generic_csv
             txns = parse_generic_csv(f.name, format_spec, rules)
 
-            # Only debits (negated to positive), income skipped
-            assert len(txns) == 2
+            # All transactions returned, but income is marked as excluded
+            assert len(txns) == 3
             assert txns[0]['amount'] == 50.00  # -50 negated to +50
-            assert txns[1]['amount'] == 5.00   # -5 negated to +5
-            # Paycheck (2000 negated to -2000) is skipped
+            assert txns[0].get('excluded') is None  # Not excluded
+            assert txns[1]['amount'] == -2000.00  # 2000 negated to -2000 (credit)
+            assert txns[1]['excluded'] == 'income'  # Marked as excluded
+            assert txns[2]['amount'] == 5.00   # -5 negated to +5
+            assert txns[2].get('excluded') is None  # Not excluded
         finally:
             os.unlink(f.name)
 

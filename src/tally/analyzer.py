@@ -375,9 +375,11 @@ def parse_generic_csv(filepath, format_spec, rules, home_locations=None, source_
             # Track if this is a credit (negative amount = income/refund)
             is_credit = amount < 0
 
-            # Skip credits if configured (for bank accounts where credits are income)
+            # Mark credits as excluded if configured (for bank accounts where credits are income)
+            # Instead of skipping, we include them but mark as excluded for transparency
+            excluded_reason = None
             if is_credit and getattr(format_spec, 'skip_negative', False):
-                continue
+                excluded_reason = 'income'  # Credit/deposit excluded from spending analysis
 
             # Extract location
             location = None
@@ -406,6 +408,7 @@ def parse_generic_csv(filepath, format_spec, rules, home_locations=None, source_
                 'is_credit': is_credit,
                 'match_info': match_info,
                 'tags': match_info.get('tags', []) if match_info else [],
+                'excluded': excluded_reason,  # None if included, or reason string if excluded
             })
 
         except (ValueError, IndexError):
@@ -740,7 +743,32 @@ def analyze_transactions(transactions):
     })
     by_month = defaultdict(float)
 
+    # Track excluded transactions separately (for transparency in UI)
+    excluded_transactions = []
+
     for txn in transactions:
+        # Track excluded transactions separately but don't include in spending analysis
+        # Exclude: income/credits from bank accounts, and Transfers category (to avoid double-counting)
+        excluded_reason = txn.get('excluded')
+        if not excluded_reason and txn['category'].lower() == 'transfers':
+            excluded_reason = 'transfer'
+
+        if excluded_reason:
+            excluded_transactions.append({
+                'date': txn['date'].strftime('%m/%d'),
+                'month': txn['date'].strftime('%Y-%m'),
+                'raw_description': txn.get('raw_description', txn['description']),
+                'description': txn['description'],
+                'merchant': txn['merchant'],
+                'amount': txn['amount'],
+                'category': txn['category'],
+                'subcategory': txn['subcategory'],
+                'source': txn['source'],
+                'location': txn.get('location'),
+                'tags': txn.get('tags', []),
+                'excluded_reason': excluded_reason,
+            })
+            continue  # Don't include in spending totals
         key = (txn['category'], txn['subcategory'])
         by_category[key]['count'] += 1
         by_category[key]['total'] += txn['amount']
@@ -917,12 +945,15 @@ def analyze_transactions(transactions):
         data['monthly_value'] = monthly_value
         variable_monthly += monthly_value
 
+    # Calculate totals only from non-excluded transactions
+    included_transactions = [t for t in transactions if not t.get('excluded')]
+
     return {
         'by_category': dict(by_category),
         'by_merchant': {k: dict(v) for k, v in by_merchant.items()},
         'by_month': dict(by_month),
-        'total': sum(t['amount'] for t in transactions),
-        'count': len(transactions),
+        'total': sum(t['amount'] for t in included_transactions),
+        'count': len(included_transactions),
         'num_months': num_months,
         # Classified merchants
         'monthly_merchants': monthly_merchants,
@@ -944,6 +975,10 @@ def analyze_transactions(transactions):
         'periodic_monthly': periodic_monthly, # Periodic / 12
         'variable_monthly': variable_monthly,
         'true_monthly': monthly_avg + annual_monthly + periodic_monthly + variable_monthly,
+        # Excluded transactions (for UI transparency)
+        'excluded_transactions': excluded_transactions,
+        'excluded_count': len(excluded_transactions),
+        'excluded_total': sum(t['amount'] for t in excluded_transactions),
     }
 
 
@@ -1505,7 +1540,11 @@ def write_summary_file_vue(stats, filepath, year=2025, home_locations=None, curr
         'sources': sources,
         'dataThrough': latest_date,
         'sections': sections,
-        'categoryView': category_view
+        'categoryView': category_view,
+        # Excluded transactions for transparency
+        'excludedTransactions': stats.get('excluded_transactions', []),
+        'excludedCount': stats.get('excluded_count', 0),
+        'excludedTotal': stats.get('excluded_total', 0),
     }
 
     # Assemble final HTML

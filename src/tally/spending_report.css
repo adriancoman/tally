@@ -1082,3 +1082,86 @@ section:nth-child(5) { animation-delay: 0.4s; }
     color: var(--text-lighter);
     font-weight: 500;
 }
+
+/* ============================================================
+   EXCLUDED TRANSACTIONS SECTION
+   ============================================================ */
+
+.excluded-note {
+    color: var(--accent-blue);
+    font-style: normal;
+    border-top: 1px dashed var(--border-light);
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    gap: 0.5rem;
+}
+.excluded-note:hover {
+    color: var(--accent-blue-light);
+    background: rgba(79, 172, 254, 0.1);
+    margin: 0.5rem -0.5rem 0;
+    padding: 0.5rem;
+}
+.excluded-note:active {
+    transform: scale(0.98);
+}
+.excluded-note .name::before {
+    content: '👁 ';
+}
+.excluded-note .name::after {
+    content: ' ▼';
+    font-size: 0.7em;
+    opacity: 0.7;
+}
+
+/* Cash Flow Card */
+.card.cashflow {
+    border-color: var(--accent-blue);
+}
+.card.cashflow .amount.positive {
+    color: var(--accent-green);
+}
+.card.cashflow .amount.negative {
+    color: var(--accent-red);
+}
+.card.cashflow .breakdown-item.clickable {
+    cursor: pointer;
+    transition: background 0.2s;
+    margin: 0 -0.5rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+}
+.card.cashflow .breakdown-item.clickable:hover {
+    background: rgba(79, 172, 254, 0.1);
+}
+.card.cashflow .income-label {
+    color: var(--accent-green);
+}
+.card.cashflow .transfers-label {
+    color: var(--accent-blue);
+}
+
+/* Income Section */
+.income-section {
+    margin-top: 2rem;
+}
+.income-section .section-header h2 {
+    color: var(--accent-green);
+}
+.income-amount {
+    color: var(--accent-green) !important;
+}
+
+/* Transfers Section */
+.transfers-section {
+    margin-top: 2rem;
+    opacity: 0.8;
+}
+.transfers-section:hover {
+    opacity: 1;
+}
+.transfers-section .section-header h2 {
+    color: var(--text-muted);
+}

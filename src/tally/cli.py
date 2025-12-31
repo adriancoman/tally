@@ -1929,23 +1929,64 @@ def cmd_explain(args):
                 if matches:
                     found_any = True
                     _print_merchant_explanation(matches[0], all_merchants[matches[0]], args.format, verbose, stats['num_months'])
+                    continue
+
+                # Try substring match on merchant names (partial search)
+                query_lower = merchant_query.lower()
+                partial_matches = [m for m in all_merchants.keys() if query_lower in m.lower()]
+                if partial_matches:
+                    found_any = True
+                    print(f"Merchants matching '{merchant_query}':\n")
+                    for m in sorted(partial_matches):
+                        _print_merchant_explanation(m, all_merchants[m], args.format, verbose, stats['num_months'])
+                    continue
+
+                # Search transactions containing the query
+                matching_txns = [t for t in all_txns if query_lower in t.get('description', '').lower()
+                                 or query_lower in t.get('raw_description', '').lower()]
+                if matching_txns:
+                    found_any = True
+                    # Group by merchant and show
+                    by_merchant = {}
+                    for t in matching_txns:
+                        m = t['merchant']
+                        if m not in by_merchant:
+                            by_merchant[m] = {'count': 0, 'total': 0, 'category': t['category'], 'subcategory': t['subcategory'], 'txns': []}
+                        by_merchant[m]['count'] += 1
+                        by_merchant[m]['total'] += t['amount']
+                        by_merchant[m]['txns'].append(t)
+                    print(f"Transactions matching '{merchant_query}':\n")
+                    for m, data in sorted(by_merchant.items(), key=lambda x: abs(x[1]['total']), reverse=True):
+                        cat = f"{data['category']} > {data['subcategory']}"
+                        print(f"  {m:<30} {cat:<25} ({data['count']} txns, ${abs(data['total']):,.0f})")
+                        if verbose >= 2:
+                            # Show individual transactions
+                            sorted_txns = sorted(data['txns'], key=lambda x: x['date'], reverse=True)
+                            for t in sorted_txns[:10]:  # Limit to 10 most recent
+                                date_str = t['date'].strftime('%m/%d') if hasattr(t['date'], 'strftime') else str(t['date'])
+                                print(f"      {date_str}  ${abs(t['amount']):>10,.2f}  {t.get('raw_description', t['description'])[:50]}")
+                            if len(sorted_txns) > 10:
+                                print(f"      ... and {len(sorted_txns) - 10} more")
+                    print()
+                    continue
+
+                # Try treating query as a raw description for rule matching
+                amount = getattr(args, 'amount', None)
+                trace = explain_description(merchant_query, rules, amount=amount, cleaning_patterns=cleaning_patterns)
+                if not trace['is_unknown']:
+                    # It matched a rule - show the explanation
+                    found_any = True
+                    _print_description_explanation(merchant_query, trace, args.format, verbose)
                 else:
-                    # Try treating query as a raw description
-                    trace = explain_description(merchant_query, rules, cleaning_patterns=cleaning_patterns)
-                    if not trace['is_unknown']:
-                        # It matched a rule - show the explanation
-                        found_any = True
-                        _print_description_explanation(merchant_query, trace, args.format, verbose)
+                    # Try fuzzy match on merchant names
+                    close_matches = get_close_matches(merchant_query, list(all_merchants.keys()), n=3, cutoff=0.6)
+                    if close_matches:
+                        print(f"No merchant matching '{merchant_query}'. Did you mean:", file=sys.stderr)
+                        for m in close_matches:
+                            print(f"  - {m}", file=sys.stderr)
                     else:
-                        # Try fuzzy match on merchant names
-                        close_matches = get_close_matches(merchant_query, list(all_merchants.keys()), n=3, cutoff=0.6)
-                        if close_matches:
-                            print(f"No merchant matching '{merchant_query}'. Did you mean:", file=sys.stderr)
-                            for m in close_matches:
-                                print(f"  - {m}", file=sys.stderr)
-                        else:
-                            # Show unknown merchant info
-                            _print_description_explanation(merchant_query, trace, args.format, verbose)
+                        # Show unknown merchant info
+                        _print_description_explanation(merchant_query, trace, args.format, verbose)
 
         if not found_any:
             sys.exit(1)
@@ -2467,13 +2508,14 @@ def main():
     explain_parser = subparsers.add_parser(
         'explain',
         help='Explain why merchants are classified the way they are',
-        description='Show classification reasoning for merchants. '
-                    'Runs analysis on-the-fly and explains the decision process.'
+        description='Show classification reasoning for merchants or transaction descriptions. '
+                    'Pass a merchant name to see its classification, or a raw transaction description '
+                    'to see which rule matches. Use --amount to test amount-based rules.'
     )
     explain_parser.add_argument(
         'merchant',
         nargs='*',
-        help='Merchant name(s) to explain (optional, shows summary if omitted)'
+        help='Merchant name or raw transaction description to explain (shows summary if omitted)'
     )
     explain_parser.add_argument(
         'config',
@@ -2509,6 +2551,11 @@ def main():
     explain_parser.add_argument(
         '--tags',
         help='Filter by tags (comma-separated, e.g., --tags business,reimbursable)'
+    )
+    explain_parser.add_argument(
+        '--amount', '-a',
+        type=float,
+        help='Transaction amount for testing amount-based rules (e.g., --amount 150.00)'
     )
 
     # workflow subcommand
