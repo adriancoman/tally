@@ -835,14 +835,23 @@ def cmd_init(args):
         except Exception:
             pass
 
-    # Show each file with its status
+    # Show each file with its status and description
     all_files = [(f, True) for f in created] + [(f, False) for f in skipped]
     # Sort by filename for consistent ordering
     all_files.sort(key=lambda x: x[0])
 
+    # Brief descriptions for key files
+    file_descriptions = {
+        'config/merchants.rules': 'categorize transactions by merchant',
+        'config/views.rules': 'group merchants into report sections',
+        'config/settings.yaml': 'data sources and settings',
+    }
+
     for f, was_created in all_files:
+        desc = file_descriptions.get(f, '')
+        desc_str = f" {C.DIM}— {desc}{C.RESET}" if desc else ""
         if was_created:
-            print(f"  {C.GREEN}✓{C.RESET} {f}")
+            print(f"  {C.GREEN}✓{C.RESET} {f}{desc_str}")
         else:
             print(f"  {C.YELLOW}→{C.RESET} {C.DIM}{f} (exists){C.RESET}")
 
@@ -2237,8 +2246,8 @@ def cmd_workflow(args):
     if not has_config:
         print(f"  {C.YELLOW}●{C.RESET} No config found")
         section("Getting Started")
-        print(f"    {C.DIM}1.{C.RESET} Initialize the project:")
-        print(f"       {C.GREEN}tally init{C.RESET}")
+        print(f"    {C.DIM}1.{C.RESET} Initialize: {C.GREEN}tally init{C.RESET}")
+        print(f"       {C.DIM}Creates settings.yaml, merchants.rules, views.rules{C.RESET}")
         print()
         print(f"    {C.DIM}2.{C.RESET} Add bank/credit card CSVs to {C.CYAN}./data/{C.RESET}")
         print()
@@ -2259,6 +2268,10 @@ def cmd_workflow(args):
         print(f"         - name: My Card")
         print(f"           file: data/transactions.csv")
         print(f"           format: \"{{date:%m/%d/%Y}},{{description}},{{amount}}\"{C.RESET}")
+        print()
+        section("Then: Categorize Transactions")
+        print(f"    {C.DIM}Use{C.RESET} {C.GREEN}tally discover{C.RESET} {C.DIM}to find merchants, add rules to:{C.RESET}")
+        print(f"    {C.CYAN}{path_merchants}{C.RESET} {C.DIM}— pattern matching for categories{C.RESET}")
         print()
         return
 
