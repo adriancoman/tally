@@ -123,12 +123,13 @@ def _migrate_csv_to_rules(csv_file: str, config_dir: str, backup: bool = True) -
         new_file = os.path.join(config_dir, 'merchants.rules')
         with open(new_file, 'w', encoding='utf-8') as f:
             f.write(content)
-        print(f"  {C.GREEN}✓{C.RESET} config/merchants.rules (converted {len(csv_rules)} rules)")
+        print(f"  {C.GREEN}✓{C.RESET} Created: config/merchants.rules")
+        print(f"      Converted {len(csv_rules)} merchant rules to new format")
 
         # Backup old file
         if backup and os.path.exists(csv_file):
             shutil.move(csv_file, csv_file + '.bak')
-            print(f"  {C.DIM}→ merchant_categories.csv renamed to .bak{C.RESET}")
+            print(f"  {C.GREEN}✓{C.RESET} Backed up: merchant_categories.csv → .bak")
 
         # Update settings.yaml to reference new file
         settings_path = os.path.join(config_dir, 'settings.yaml')
@@ -139,7 +140,8 @@ def _migrate_csv_to_rules(csv_file: str, config_dir: str, backup: bool = True) -
                 with open(settings_path, 'a', encoding='utf-8') as f:
                     f.write('\n# Merchant rules file (migrated from CSV)\n')
                     f.write('merchants_file: config/merchants.rules\n')
-                print(f"  {C.GREEN}✓{C.RESET} config/settings.yaml (updated)")
+                print(f"  {C.GREEN}✓{C.RESET} Updated: config/settings.yaml")
+                print(f"      Added merchants_file: config/merchants.rules")
 
         return True
     except Exception as e:
@@ -179,10 +181,13 @@ def _check_merchant_migration(config: dict, config_dir: str, quiet: bool = False
 
         if not quiet:
             print()
-            print(f"{C.YELLOW}⚠️  Deprecation Notice:{C.RESET}")
-            print(f"   {C.DIM}merchant_categories.csv is deprecated.{C.RESET}")
-            print(f"   {C.DIM}The new .rules format supports expression-based rules like:{C.RESET}")
-            print(f"   {C.DIM}  match: contains(\"COSTCO\") and amount > 200{C.RESET}")
+            print(f"{C.YELLOW}╭─ Upgrade Available ─────────────────────────────────────────────────╮{C.RESET}")
+            print(f"{C.YELLOW}│{C.RESET} Found: merchant_categories.csv (legacy CSV format)                  {C.YELLOW}│{C.RESET}")
+            print(f"{C.YELLOW}│{C.RESET}                                                                      {C.YELLOW}│{C.RESET}")
+            print(f"{C.YELLOW}│{C.RESET} The new .rules format supports powerful expressions:                 {C.YELLOW}│{C.RESET}")
+            print(f"{C.YELLOW}│{C.RESET}   match: contains(\"COSTCO\") and amount > 200                        {C.YELLOW}│{C.RESET}")
+            print(f"{C.YELLOW}│{C.RESET}   match: regex(\"UBER.*EATS\") and month == 12                        {C.YELLOW}│{C.RESET}")
+            print(f"{C.YELLOW}╰──────────────────────────────────────────────────────────────────────╯{C.RESET}")
             print()
 
         if is_interactive:
@@ -194,17 +199,20 @@ def _check_merchant_migration(config: dict, config_dir: str, quiet: bool = False
                 should_migrate = False
 
             if not should_migrate:
-                print(f"   {C.DIM}Continuing with CSV format (migration skipped){C.RESET}")
+                print(f"   {C.DIM}Skipped - continuing with CSV format for this run{C.RESET}")
                 print()
         elif not migrate and not quiet:
             # Non-interactive without --migrate flag
-            print(f"   {C.DIM}Use --migrate flag to convert to new format{C.RESET}")
+            print(f"   {C.DIM}Tip: Run with --migrate to convert automatically{C.RESET}")
             print()
 
         if should_migrate:
             # Perform migration using shared helper
+            print(f"{C.CYAN}Migrating to new format...{C.RESET}")
             print()
             if _migrate_csv_to_rules(merchants_file, config_dir, backup=True):
+                print()
+                print(f"{C.GREEN}Migration complete!{C.RESET} Your rules now support expressions.")
                 print()
                 # Return new rules from migrated file
                 new_file = os.path.join(config_dir, 'merchants.rules')
@@ -770,7 +778,8 @@ def cmd_init(args):
     # If user didn't explicitly specify a directory, use current dir instead of ./tally/
     if args.dir == 'tally' and os.path.isdir('./config'):
         target_dir = os.path.abspath('.')
-        print(f"{C.YELLOW}Note:{C.RESET} Found existing config/ directory, initializing here instead of ./tally/")
+        print(f"{C.CYAN}Found existing config/ directory{C.RESET}")
+        print(f"  Upgrading current directory in place (won't create nested tally/)")
         print()
     else:
         target_dir = os.path.abspath(args.dir)
@@ -802,8 +811,10 @@ def cmd_init(args):
             pass
 
         if has_rules:
-            print(f"{C.YELLOW}Found legacy merchant_categories.csv with rules.{C.RESET}")
-            print(f"Converting to new merchants.rules format...")
+            print()
+            print(f"{C.CYAN}Upgrading merchant rules to new format...{C.RESET}")
+            print(f"  Found: config/merchant_categories.csv (legacy CSV format)")
+            print()
             _migrate_csv_to_rules(old_csv, config_dir, backup=True)
             print()
 
@@ -1792,10 +1803,13 @@ def cmd_diag(args):
 
     # Settings file
     settings_path = os.path.join(config_dir, args.settings)
+    budget_dir = os.path.dirname(config_dir)
     print(f"Settings file: {settings_path}")
     print(f"  Exists: {os.path.exists(settings_path)}")
 
     config = None
+    config_issues = []
+
     if os.path.exists(settings_path):
         try:
             config = load_config(config_dir, args.settings)
@@ -1818,6 +1832,114 @@ def cmd_diag(args):
         except Exception as e:
             print(f"  Loaded successfully: No")
             print(f"  Error: {e}")
+            config_issues.append(f"settings.yaml error: {e}")
+    else:
+        config_issues.append("settings.yaml not found")
+    print()
+
+    # CONFIG HEALTH CHECK - identify common issues
+    print("CONFIG HEALTH CHECK")
+    print("-" * 70)
+
+    # Check for legacy CSV file
+    legacy_csv = os.path.join(config_dir, 'merchant_categories.csv')
+    merchants_rules = os.path.join(config_dir, 'merchants.rules')
+    views_rules = os.path.join(config_dir, 'views.rules')
+
+    if os.path.exists(legacy_csv) and not os.path.exists(merchants_rules):
+        config_issues.append(f"Legacy CSV format detected: {os.path.basename(legacy_csv)}")
+        print(f"  {C.YELLOW}⚠{C.RESET}  Legacy merchant_categories.csv found")
+        print(f"       Run 'tally run --migrate' to upgrade to .rules format")
+
+    # Check if merchants_file is set in settings
+    if config:
+        merchants_file_setting = config.get('merchants_file')
+        views_file_setting = config.get('views_file')
+
+        # Check merchants_file reference
+        if not merchants_file_setting:
+            if os.path.exists(merchants_rules):
+                config_issues.append("merchants.rules exists but not configured in settings.yaml")
+                print(f"  {C.YELLOW}⚠{C.RESET}  config/merchants.rules exists but not in settings.yaml")
+                print(f"       Add: merchants_file: config/merchants.rules")
+            elif not os.path.exists(legacy_csv):
+                print(f"  {C.YELLOW}⚠{C.RESET}  No merchant rules configured")
+                print(f"       All transactions will be categorized as 'Unknown'")
+        else:
+            resolved_path = os.path.join(budget_dir, merchants_file_setting)
+            if not os.path.exists(resolved_path):
+                config_issues.append(f"merchants_file points to missing file: {merchants_file_setting}")
+                print(f"  {C.RED}✗{C.RESET}  merchants_file: {merchants_file_setting}")
+                print(f"       File not found at: {resolved_path}")
+            else:
+                print(f"  {C.GREEN}✓{C.RESET}  merchants_file: {merchants_file_setting}")
+
+        # Check views_file reference
+        if not views_file_setting:
+            if os.path.exists(views_rules):
+                config_issues.append("views.rules exists but not configured in settings.yaml")
+                print(f"  {C.YELLOW}⚠{C.RESET}  config/views.rules exists but not in settings.yaml")
+                print(f"       Add: views_file: config/views.rules")
+        else:
+            resolved_path = os.path.join(budget_dir, views_file_setting)
+            if not os.path.exists(resolved_path):
+                config_issues.append(f"views_file points to missing file: {views_file_setting}")
+                print(f"  {C.RED}✗{C.RESET}  views_file: {views_file_setting}")
+                print(f"       File not found at: {resolved_path}")
+            else:
+                print(f"  {C.GREEN}✓{C.RESET}  views_file: {views_file_setting}")
+
+        # Check data sources
+        data_sources = config.get('data_sources', [])
+        if not data_sources:
+            config_issues.append("No data sources configured")
+            print(f"  {C.YELLOW}⚠{C.RESET}  No data sources configured")
+            print(f"       Add data_sources to settings.yaml to process transactions")
+        else:
+            missing_sources = []
+            for source in data_sources:
+                filepath = os.path.join(budget_dir, source['file'])
+                if not os.path.exists(filepath):
+                    missing_sources.append(source['file'])
+            if missing_sources:
+                config_issues.append(f"Missing data files: {', '.join(missing_sources)}")
+                for f in missing_sources:
+                    print(f"  {C.RED}✗{C.RESET}  data source: {f}")
+                    print(f"       File not found")
+            else:
+                print(f"  {C.GREEN}✓{C.RESET}  data_sources: {len(data_sources)} configured, all files exist")
+
+    if not config_issues:
+        print(f"  {C.GREEN}✓{C.RESET}  All configuration files are valid")
+
+    print()
+
+    # FILE PATHS - show how paths are resolved
+    print("FILE PATHS")
+    print("-" * 70)
+    print(f"  Budget directory:  {budget_dir}")
+    print(f"  Config directory:  {config_dir}")
+    print()
+    print("  Path resolution (relative paths in settings.yaml are resolved from budget dir):")
+    if config:
+        if config.get('merchants_file'):
+            mf = config['merchants_file']
+            resolved = os.path.join(budget_dir, mf)
+            exists = "exists" if os.path.exists(resolved) else "NOT FOUND"
+            print(f"    merchants_file: {mf}")
+            print(f"      → {resolved} ({exists})")
+        if config.get('views_file'):
+            vf = config['views_file']
+            resolved = os.path.join(budget_dir, vf)
+            exists = "exists" if os.path.exists(resolved) else "NOT FOUND"
+            print(f"    views_file: {vf}")
+            print(f"      → {resolved} ({exists})")
+        for source in config.get('data_sources', []):
+            sf = source['file']
+            resolved = os.path.join(budget_dir, sf)
+            exists = "exists" if os.path.exists(resolved) else "NOT FOUND"
+            print(f"    data_source: {sf}")
+            print(f"      → {resolved} ({exists})")
     print()
 
     # Data sources
