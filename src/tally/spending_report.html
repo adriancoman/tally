@@ -86,13 +86,14 @@
                         </div>
                     </div>
                 </div>
-                <div class="card cashflow" v-if="incomeCount > 0 || transfersCount > 0">
+                <!-- Cash Flow card - only show when there's income to make the flow meaningful -->
+                <div class="card cashflow" v-if="incomeCount > 0">
                     <h2>Cash Flow</h2>
                     <div class="amount" :class="{ positive: netCashFlow >= 0, negative: netCashFlow < 0 }">
                         {{ netCashFlow >= 0 ? '+' : '' }}{{ formatCurrency(netCashFlow) }}
                     </div>
                     <div class="breakdown">
-                        <div class="breakdown-item clickable" v-if="incomeCount > 0" @click="scrollToIncome">
+                        <div class="breakdown-item clickable" @click="scrollToIncome">
                             <span class="name income-label">Income</span>
                             <span class="value">+{{ formatCurrency(Math.abs(incomeTotal)) }}</span>
                         </div>
@@ -102,7 +103,18 @@
                         </div>
                         <div class="breakdown-item clickable" v-if="transfersCount > 0" @click="scrollToTransfers">
                             <span class="name transfers-label">Transfers</span>
-                            <span class="value">-{{ formatCurrency(transfersTotal) }}</span>
+                            <span class="value">-{{ formatCurrency(Math.abs(transfersTotal)) }}</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Transfers-only card - show when there are transfers but no income -->
+                <div class="card transfers-summary" v-else-if="transfersCount > 0">
+                    <h2>Transfers</h2>
+                    <div class="amount">{{ formatCurrency(Math.abs(transfersTotal)) }}</div>
+                    <div class="breakdown">
+                        <div class="breakdown-item clickable" @click="scrollToTransfers">
+                            <span class="name transfers-label">Credit card payments, etc.</span>
+                            <span class="value">{{ transfersCount }} transactions</span>
                         </div>
                     </div>
                 </div>

@@ -377,26 +377,29 @@ createApp({
             return months.size || 1;
         });
 
-        // Chart data aggregations
+        // Chart data aggregations - always uses categoryView for consistent data
         const chartAggregations = computed(() => {
             const byMonth = {};
             const byCategory = {};
             const byCategoryByMonth = {};
 
-            for (const section of Object.values(filteredSections.value)) {
-                for (const merchant of Object.values(section.filteredMerchants)) {
-                    for (const txn of merchant.filteredTxns) {
-                        // By month
-                        byMonth[txn.month] = (byMonth[txn.month] || 0) + txn.amount;
+            // Use categoryView which always has data (doesn't require views_file)
+            const categoryView = filteredCategoryView.value;
+            for (const [catName, category] of Object.entries(categoryView)) {
+                for (const subcat of Object.values(category.filteredSubcategories || {})) {
+                    for (const merchant of Object.values(subcat.filteredMerchants || {})) {
+                        for (const txn of merchant.filteredTxns || []) {
+                            // By month
+                            byMonth[txn.month] = (byMonth[txn.month] || 0) + txn.amount;
 
-                        // By main category
-                        const cat = merchant.category;
-                        byCategory[cat] = (byCategory[cat] || 0) + txn.amount;
+                            // By main category
+                            byCategory[catName] = (byCategory[catName] || 0) + txn.amount;
 
-                        // By category by month
-                        if (!byCategoryByMonth[cat]) byCategoryByMonth[cat] = {};
-                        byCategoryByMonth[cat][txn.month] =
-                            (byCategoryByMonth[cat][txn.month] || 0) + txn.amount;
+                            // By category by month
+                            if (!byCategoryByMonth[catName]) byCategoryByMonth[catName] = {};
+                            byCategoryByMonth[catName][txn.month] =
+                                (byCategoryByMonth[catName][txn.month] || 0) + txn.amount;
+                        }
                     }
                 }
             }
@@ -542,10 +545,27 @@ createApp({
         // Available months for date picker
         const availableMonths = computed(() => {
             const months = new Set();
-            for (const section of Object.values(spendingData.value.sections || {})) {
-                for (const merchant of Object.values(section.merchants || {})) {
-                    for (const txn of merchant.transactions || []) {
-                        months.add(txn.month);
+            const sections = spendingData.value.sections || {};
+
+            // Use sections if available, otherwise fall back to categoryView
+            if (Object.keys(sections).length > 0) {
+                for (const section of Object.values(sections)) {
+                    for (const merchant of Object.values(section.merchants || {})) {
+                        for (const txn of merchant.transactions || []) {
+                            months.add(txn.month);
+                        }
+                    }
+                }
+            } else {
+                // Fall back to categoryView when no views configured
+                const categoryView = spendingData.value.categoryView || {};
+                for (const category of Object.values(categoryView)) {
+                    for (const subcat of Object.values(category.subcategories || {})) {
+                        for (const merchant of Object.values(subcat.merchants || {})) {
+                            for (const txn of merchant.transactions || []) {
+                                months.add(txn.month);
+                            }
+                        }
                     }
                 }
             }

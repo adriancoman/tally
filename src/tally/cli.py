@@ -2358,6 +2358,20 @@ def cmd_workflow(args):
     print(f"    {C.DIM}First match wins — put specific patterns before general ones{C.RESET}")
     print(f"    {C.DIM}Tags are accumulated from ALL matching rules{C.RESET}")
 
+    section("Special Categories")
+    print(f"    {C.DIM}These categories are excluded from spending analysis:{C.RESET}")
+    print()
+    special_cats = [
+        ('Transfers', "Credit card payments, account transfers"),
+        ('Payments', "Bill payments, loan payments"),
+        ('Cash', "ATM withdrawals (tracked separately)"),
+    ]
+    for cat, desc in special_cats:
+        print(f"      {C.CYAN}{cat:<12}{C.RESET} {C.DIM}{desc}{C.RESET}")
+    print()
+    print(f"    {C.DIM}Use these for transactions that aren't actual spending.{C.RESET}")
+    print(f"    {C.DIM}They appear in the Transfers section of the report.{C.RESET}")
+
     section("Views (Optional)")
     print(f"    {C.DIM}Group merchants into report sections with {C.RESET}{C.CYAN}config/views.rules{C.RESET}")
     print(f"    {C.DIM}Views can overlap — same merchant can appear in multiple views{C.RESET}")
@@ -2594,9 +2608,14 @@ def cmd_explain(args):
                         by_merchant[m]['total'] += t['amount']
                         by_merchant[m]['txns'].append(t)
                     print(f"Transactions matching '{merchant_query}':\n")
+                    # Special categories excluded from spending analysis
+                    excluded_categories = {'Transfers', 'Payments', 'Cash'}
                     for m, data in sorted(by_merchant.items(), key=lambda x: abs(x[1]['total']), reverse=True):
                         cat = f"{data['category']} > {data['subcategory']}"
-                        print(f"  {m:<30} {cat:<25} ({data['count']} txns, ${abs(data['total']):,.0f})")
+                        excluded_note = ""
+                        if data['category'] in excluded_categories:
+                            excluded_note = " [excluded from spending]"
+                        print(f"  {m:<30} {cat:<25} ({data['count']} txns, ${abs(data['total']):,.0f}){excluded_note}")
                         if verbose >= 2:
                             # Show individual transactions
                             sorted_txns = sorted(data['txns'], key=lambda x: x['date'], reverse=True)
@@ -2771,6 +2790,9 @@ def _print_description_explanation(query, trace, output_format, verbose):
             print(f"**Matched On:** {rule['matched_on']} description")
             print(f"**Merchant:** {trace['merchant']}")
             print(f"**Category:** {trace['category']} > {trace['subcategory']}")
+            # Note about special categories
+            if trace['category'] in ('Transfers', 'Payments', 'Cash'):
+                print(f"**Note:** This category is excluded from spending analysis")
             if rule.get('tags'):
                 print(f"**Tags:** {', '.join(rule['tags'])}")
         print()
@@ -2796,6 +2818,9 @@ def _print_description_explanation(query, trace, output_format, verbose):
             print(f"    {C.DIM}subcategory: {trace['subcategory']}{C.RESET}")
             if rule.get('tags'):
                 print(f"    {C.DIM}tags: {', '.join(rule['tags'])}{C.RESET}")
+            # Note about special categories
+            if trace['category'] in ('Transfers', 'Payments', 'Cash'):
+                print(f"  {C.DIM}Note: This category is excluded from spending analysis{C.RESET}")
             if verbose >= 1:
                 print(f"  Matched on: {rule['matched_on']} description")
         print()

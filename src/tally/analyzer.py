@@ -580,9 +580,9 @@ def analyze_transactions(transactions):
 
     for txn in transactions:
         # Track excluded transactions separately but don't include in spending analysis
-        # Exclude: income/credits from bank accounts, and Transfers category (to avoid double-counting)
+        # Exclude: income/credits from bank accounts, Transfers and Payments categories
         excluded_reason = txn.get('excluded')
-        if not excluded_reason and txn['category'].lower() == 'transfers':
+        if not excluded_reason and txn['category'].lower() in ('transfers', 'payments'):
             excluded_reason = 'transfer'
 
         if excluded_reason:
@@ -1105,7 +1105,7 @@ def print_summary(stats, year=2025, filter_category=None, currency_format="${amo
     variable_merchants = stats['variable_merchants']
 
     # Exclude transfers and cash for "actual spending"
-    excluded_categories = {'Transfers', 'Cash'}
+    excluded_categories = {'Transfers', 'Payments', 'Cash'}
     actual_spending = sum(
         data['total'] for (cat, sub), data in by_category.items()
         if cat not in excluded_categories
@@ -1608,7 +1608,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None, currency
     one_off_merchants = stats['one_off_merchants']
     variable_merchants = stats['variable_merchants']
 
-    excluded = {'Transfers', 'Cash'}
+    excluded = {'Transfers', 'Payments', 'Cash'}
     actual = sum(d['total'] for (c, s), d in by_category.items() if c not in excluded)
     uncat = by_category.get(('Other', 'Uncategorized'), {'total': 0})['total']
 
@@ -1622,7 +1622,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None, currency
     # Collect all unique categories and subcategories for dropdown
     all_categories = set()
     for cat, sub in by_category.keys():
-        if cat not in ('Transfers', 'Cash'):
+        if cat not in ('Transfers', 'Payments', 'Cash'):
             all_categories.add(cat)
             if sub:
                 all_categories.add(sub)
@@ -1750,7 +1750,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None, currency
         chart_js_content = '// Chart.js not found - charts will not render'
 
     # Prepare chart data
-    # 1. Monthly spending trend (excluding Transfers and Cash)
+    # 1. Monthly spending trend (excluding Transfers, Payments, and Cash)
     # Calculate from classified merchants to match YTD totals
     spending_by_month = defaultdict(float)
     all_merchant_dicts = [
