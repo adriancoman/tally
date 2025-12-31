@@ -65,55 +65,17 @@
                     <span class="toggle">{{ helpCollapsed ? '▶' : '▼' }}</span>
                 </div>
                 <div class="help-section-content">
-                    <span class="label">Every Month:</span>
-                    <span class="value">Consistent payments averaged when active (e.g., Netflix $15×6mo = $90 YTD → $15/mo avg). Irregular amounts show YTD÷12.</span>
-                    <span class="label">Varies by Month:</span>
-                    <span class="value">YTD ÷ months active (e.g., Groceries $600 over 4 months → $150/mo).</span>
+                    <span class="label">Categories:</span>
+                    <span class="value">Merchants are grouped by their assigned category from merchant_categories.csv</span>
                     <span class="label">Terms:</span>
-                    <span class="value"><code>YTD</code> year-to-date total · <code>/mo</code> monthly cost · <code>Months</code> months with transactions</span>
-                    <span class="label">Frequency Groups:</span>
-                    <span class="value"><strong>Every Month</strong> (6+ months) · <strong>Once a Year</strong> · <strong>A Few Times/Year</strong> · <strong>Travel Expenses</strong> · <strong>Large One-Time</strong> · <strong>Varies by Month</strong></span>
+                    <span class="value"><code>YTD</code> year-to-date total · <code>Count</code> number of transactions</span>
+                    <span class="label">Filters:</span>
+                    <span class="value">Click on categories, tags, or locations to filter. Use search to find specific merchants.</span>
                 </div>
             </div>
 
             <!-- Summary Cards -->
             <div class="summary-grid">
-                <div class="card monthly">
-                    <h2>Monthly Budget</h2>
-                    <div class="amount">{{ formatCurrency(monthlyBudget) }}<span class="per-month">/mo</span></div>
-                    <div class="breakdown">
-                        <div class="breakdown-item">
-                            <span class="name">Every Month</span>
-                            <span class="value">{{ formatCurrency(monthlyRecurringAvg) }} <span class="breakdown-pct">({{ formatPct(sectionTotals.monthly || 0, grandTotal) }})</span></span>
-                        </div>
-                        <div class="breakdown-item">
-                            <span class="name">Varies by Month</span>
-                            <span class="value">{{ formatCurrency(variableMonthlyAvg) }} <span class="breakdown-pct">({{ formatPct(sectionTotals.variable || 0, grandTotal) }})</span></span>
-                        </div>
-                    </div>
-                </div>
-                <div class="card non-recurring">
-                    <h2>Non-Recurring (YTD)</h2>
-                    <div class="amount">{{ formatCurrency(nonRecurringTotal) }} <span class="breakdown-pct">({{ formatPct(nonRecurringTotal, grandTotal) }})</span></div>
-                    <div class="breakdown">
-                        <div class="breakdown-item">
-                            <span class="name">Once a Year</span>
-                            <span class="value">{{ formatCurrency(sectionTotals.annual || 0) }}</span>
-                        </div>
-                        <div class="breakdown-item">
-                            <span class="name">A Few Times/Year</span>
-                            <span class="value">{{ formatCurrency(sectionTotals.periodic || 0) }}</span>
-                        </div>
-                        <div class="breakdown-item">
-                            <span class="name">Travel Expenses</span>
-                            <span class="value">{{ formatCurrency(sectionTotals.travel || 0) }}</span>
-                        </div>
-                        <div class="breakdown-item">
-                            <span class="name">Large One-Time</span>
-                            <span class="value">{{ formatCurrency(sectionTotals.oneoff || 0) }}</span>
-                        </div>
-                    </div>
-                </div>
                 <div class="card total">
                     <h2>Total Spending (YTD)</h2>
                     <div class="amount">{{ formatCurrency(grandTotal) }}</div>
@@ -178,15 +140,8 @@
                 </div>
             </div>
 
-            <!-- View Toggle -->
-            <div class="view-toggle">
-                <button :class="{ active: currentView === 'category' }" @click="setView('category')">By Category</button>
-                <button :class="{ active: currentView === 'pattern' }" @click="setView('pattern')">By Frequency</button>
-            </div>
-
             <!-- Category View -->
-            <template v-if="currentView === 'category'">
-                <template v-for="(category, categoryName) in filteredCategoryView" :key="categoryName">
+            <template v-for="(category, categoryName) in filteredCategoryView" :key="categoryName">
                     <section class="category-section">
                         <div class="section-header" @click="toggleSection('cat:' + categoryName)">
                             <h2>
@@ -208,7 +163,6 @@
                                             <th>Subcategory</th>
                                             <th>Count</th>
                                             <th>Tags</th>
-                                            <th>Monthly</th>
                                             <th>Total</th>
                                             <th>%</th>
                                         </tr>
@@ -235,9 +189,6 @@
                                                               class="tag-badge"
                                                               @click.stop="addFilter(tag, 'tag')">{{ tag }}</span>
                                                     </td>
-                                                    <td class="money">
-                                                        {{ formatCurrency(merchant.filteredTotal / numFilteredMonths) }}<span class="per-month">/mo</span>
-                                                    </td>
                                                     <td class="money">{{ formatCurrency(merchant.filteredTotal) }}</td>
                                                     <td class="pct">{{ formatPct(merchant.filteredTotal, category.filteredTotal) }}</td>
                                                 </tr>
@@ -245,7 +196,7 @@
                                                     :key="txn.id"
                                                     class="txn-row"
                                                     :class="{ hidden: !expandedMerchants.has(merchantId) }">
-                                                    <td colspan="7">
+                                                    <td colspan="6">
                                                         <div class="txn-detail">
                                                             <span class="txn-date">{{ formatDate(txn.date) }}</span>
                                                             <span v-if="txn.source" class="txn-source" :class="txn.source.toLowerCase()">{{ txn.source }}</span>
@@ -258,6 +209,10 @@
                                                                   @click.stop="addFilter(txn.location, 'location')">
                                                                 {{ txn.location }}
                                                             </span>
+                                                            <span v-for="tag in (txn.tags || [])"
+                                                                  :key="tag"
+                                                                  class="tag-badge"
+                                                                  @click.stop="addFilter(tag, 'tag')">{{ tag }}</span>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -265,9 +220,6 @@
                                         </template>
                                         <tr class="total-row">
                                             <td colspan="4">Total</td>
-                                            <td class="money">
-                                                {{ formatCurrency(category.filteredTotal / numFilteredMonths) }}<span class="per-month">/mo</span>
-                                            </td>
                                             <td class="money">{{ formatCurrency(category.filteredTotal) }}</td>
                                             <td class="pct">100%</td>
                                         </tr>
@@ -277,113 +229,6 @@
                         </div>
                     </section>
                 </template>
-            </template>
-
-            <!-- Pattern View (By Frequency) -->
-            <template v-if="currentView === 'pattern'" v-for="(section, sectionId) in visibleSections" :key="sectionId">
-                <section :class="sectionId + '-section'">
-                    <div class="section-header" @click="toggleSection(sectionId)" :title="section.description">
-                        <h2>
-                            <span class="toggle">{{ collapsedSections.has(sectionId) ? '▶' : '▼' }}</span>
-                            {{ section.title }}
-                            <span class="info-icon" v-if="section.description">ⓘ
-                                <span class="tooltip">{{ section.description }}</span>
-                            </span>
-                        </h2>
-                        <span class="section-total">
-                            <template v-if="section.hasMonthlyColumn">
-                                <span class="section-monthly">{{ formatCurrency(sectionTotals[sectionId] / numFilteredMonths) }}/mo</span> ·
-                            </template>
-                            <span class="section-ytd">{{ formatCurrency(sectionTotals[sectionId]) }}</span>
-                            <span class="section-pct">({{ formatPct(sectionTotals[sectionId], grandTotal) }})</span>
-                        </span>
-                    </div>
-                    <div class="section-content" :class="{ collapsed: collapsedSections.has(sectionId) }">
-                        <div class="table-wrapper">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Merchant</th>
-                                        <th v-if="section.hasMonthlyColumn">Months</th>
-                                        <th>Count</th>
-                                        <th>Category</th>
-                                        <th>Tags</th>
-                                        <th v-if="section.hasMonthlyColumn" title="avg = average when active, /12 = YTD divided by 12">Type</th>
-                                        <th v-if="section.hasMonthlyColumn">Monthly</th>
-                                        <th>Total</th>
-                                        <th>%</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <template v-for="(merchant, merchantId) in sortedMerchants(section.filteredMerchants, sectionId)" :key="merchantId">
-                                        <!-- Merchant Row -->
-                                        <tr class="merchant-row"
-                                            :class="{ expanded: expandedMerchants.has(merchantId) }"
-                                            @click="toggleExpand(merchantId)">
-                                            <td class="merchant clickable">
-                                                <span class="chevron">{{ expandedMerchants.has(merchantId) ? '▼' : '▶' }}</span>
-                                                <span @click.stop="addFilter(merchantId, 'merchant', merchant.displayName)">
-                                                    {{ merchant.displayName }}
-                                                </span>
-                                            </td>
-                                            <td v-if="section.hasMonthlyColumn">{{ merchant.filteredMonths }}</td>
-                                            <td>{{ merchant.filteredCount }}</td>
-                                            <td class="category clickable" @click.stop="addFilter(merchant.subcategory, 'category')">
-                                                {{ merchant.subcategory }}
-                                            </td>
-                                            <td class="tags-cell">
-                                                <span v-for="tag in (merchant.tags || [])"
-                                                      :key="tag"
-                                                      class="tag-badge"
-                                                      @click.stop="addFilter(tag, 'tag')">{{ tag }}</span>
-                                            </td>
-                                            <td v-if="section.hasMonthlyColumn">
-                                                <span class="badge" :class="merchant.calcType === 'avg' ? 'avg' : 'div'" :title="merchant.calcType === 'avg' ? 'Average when active — consistent monthly payments' : 'YTD ÷ 12 — irregular payment amounts'">
-                                                    {{ merchant.calcType || '/12' }}
-                                                </span>
-                                            </td>
-                                            <td v-if="section.hasMonthlyColumn" class="money">
-                                                {{ formatCurrency(merchant.filteredTotal / numFilteredMonths) }}<span class="per-month">/mo</span>
-                                            </td>
-                                            <td class="money">{{ formatCurrency(merchant.filteredTotal) }}</td>
-                                            <td class="pct">{{ formatPct(merchant.filteredTotal, sectionTotals[sectionId]) }}</td>
-                                        </tr>
-                                        <!-- Transaction Rows -->
-                                        <tr v-for="txn in merchant.filteredTxns"
-                                            :key="txn.id"
-                                            class="txn-row"
-                                            :class="{ hidden: !expandedMerchants.has(merchantId) }">
-                                            <td :colspan="section.hasMonthlyColumn ? 9 : 6">
-                                                <div class="txn-detail">
-                                                    <span class="txn-date">{{ formatDate(txn.date) }}</span>
-                                                    <span v-if="txn.source" class="txn-source" :class="txn.source.toLowerCase()">{{ txn.source }}</span>
-                                                    <span class="txn-desc">{{ txn.description }}</span>
-                                                    <span class="txn-amount">{{ formatCurrency(txn.amount) }}</span>
-                                                    <span class="txn-badge" :class="{ refund: txn.amount < 0 }">{{ txn.amount < 0 ? 'REFUND' : '' }}</span>
-                                                    <span v-if="txn.location"
-                                                          class="txn-location clickable"
-                                                          :class="getLocationClass(txn.location)"
-                                                          @click.stop="addFilter(txn.location, 'location')">
-                                                        {{ txn.location }}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                    <!-- Total Row -->
-                                    <tr class="total-row">
-                                        <td :colspan="section.hasMonthlyColumn ? 6 : 4">Total</td>
-                                        <td v-if="section.hasMonthlyColumn" class="money">
-                                            {{ formatCurrency(sectionTotals[sectionId] / numFilteredMonths) }}<span class="per-month">/mo</span>
-                                        </td>
-                                        <td class="money">{{ formatCurrency(sectionTotals[sectionId]) }}</td>
-                                        <td class="pct">100%</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
             </template>
 
             <!-- Income Section -->

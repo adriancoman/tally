@@ -23,7 +23,6 @@ createApp({
         const isDarkTheme = ref(true);
         const chartsCollapsed = ref(false);
         const helpCollapsed = ref(true);
-        const currentView = ref('category'); // 'category' or 'pattern'
         const showExcluded = ref(false); // Toggle for excluded transactions (income/credits)
 
         // Chart refs
@@ -164,31 +163,6 @@ createApp({
         const grandTotal = computed(() =>
             Object.values(sectionTotals.value).reduce((sum, t) => sum + t, 0)
         );
-
-        // Monthly budget (monthly + variable sections)
-        const monthlyBudget = computed(() => {
-            const monthly = sectionTotals.value.monthly || 0;
-            const variable = sectionTotals.value.variable || 0;
-            return (monthly + variable) / numFilteredMonths.value;
-        });
-
-        // Non-recurring total
-        const nonRecurringTotal = computed(() => {
-            const { annual = 0, periodic = 0, travel = 0, oneoff = 0 } = sectionTotals.value;
-            return annual + periodic + travel + oneoff;
-        });
-
-        // Monthly recurring average
-        const monthlyRecurringAvg = computed(() => {
-            const monthly = sectionTotals.value.monthly || 0;
-            return monthly / numFilteredMonths.value;
-        });
-
-        // Variable monthly average
-        const variableMonthlyAvg = computed(() => {
-            const variable = sectionTotals.value.variable || 0;
-            return variable / numFilteredMonths.value;
-        });
 
         // Uncategorized total
         const uncategorizedTotal = computed(() => {
@@ -652,18 +626,6 @@ createApp({
             }
         }
 
-        function setView(view) {
-            currentView.value = view;
-            localStorage.setItem('spending-view', view);
-        }
-
-        function initView() {
-            const saved = localStorage.getItem('spending-view');
-            if (saved === 'pattern' || saved === 'category') {
-                currentView.value = saved;
-            }
-        }
-
         // ========== URL HASH ==========
 
         function filtersToHash() {
@@ -905,7 +867,6 @@ createApp({
 
         onMounted(() => {
             initTheme();
-            initView();
 
             // Wait for next tick to ensure computed properties are ready
             nextTick(() => {
@@ -937,13 +898,12 @@ createApp({
             // State
             activeFilters, expandedMerchants, collapsedSections, searchQuery,
             showAutocomplete, autocompleteIndex, isScrolled, isDarkTheme, chartsCollapsed, helpCollapsed,
-            currentView, showIncome, showTransfers,
+            showIncome, showTransfers,
             // Refs
             monthlyChart, categoryPieChart, categoryByMonthChart,
             // Computed
             spendingData, title, subtitle,
-            visibleSections, filteredCategoryView, sectionTotals, grandTotal, monthlyBudget, nonRecurringTotal,
-            monthlyRecurringAvg, variableMonthlyAvg, uncategorizedTotal,
+            visibleSections, filteredCategoryView, sectionTotals, grandTotal, uncategorizedTotal,
             numFilteredMonths, filteredAutocomplete, availableMonths,
             // Cash flow
             incomeTotal, incomeCount, groupedIncome, expandedIncome,
@@ -954,7 +914,7 @@ createApp({
             toggleExpand, toggleSection, sortedMerchants,
             formatCurrency, formatDate, formatMonthLabel, formatPct, filterTypeChar, getLocationClass,
             onSearchInput, onSearchKeydown, selectAutocompleteItem,
-            toggleTheme, setView, scrollToIncome, scrollToTransfers
+            toggleTheme, scrollToIncome, scrollToTransfers
         };
     }
 }).mount('#app');

@@ -789,7 +789,8 @@ def analyze_transactions(transactions):
             'description': txn['description'],
             'amount': txn['amount'],
             'source': txn['source'],
-            'location': txn.get('location')
+            'location': txn.get('location'),
+            'tags': txn.get('tags', [])
         })
         # Track max payment
         if txn['amount'] > by_merchant[txn['merchant']]['max_payment']:
@@ -1423,7 +1424,8 @@ def write_summary_file_vue(stats, filepath, year=2025, home_locations=None, curr
                     'description': txn.get('description', ''),
                     'amount': txn.get('amount', 0),
                     'source': txn.get('source', ''),
-                    'location': txn.get('location')
+                    'location': txn.get('location'),
+                    'tags': txn.get('tags', [])
                 })
 
             merchants[merchant_id] = {
@@ -1910,7 +1912,8 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None, currency
                     'description': txn.get('description', ''),
                     'amount': txn.get('amount', 0),
                     'source': txn.get('source', ''),
-                    'location': txn.get('location')
+                    'location': txn.get('location'),
+                    'tags': txn.get('tags', [])
                 })
 
             merchants[merchant_id] = {

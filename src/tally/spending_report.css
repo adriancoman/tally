@@ -530,33 +530,6 @@ section.oneoff-section .section-header h2 { color: var(--accent-pink-dark); }
 section.variable-section .section-header h2 { color: var(--accent-cyan); }
 section.category-section .section-header h2 { color: var(--accent-blue); }
 
-/* View Toggle */
-.view-toggle {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    justify-content: center;
-}
-.view-toggle button {
-    padding: 0.5rem 1.25rem;
-    border: 1px solid var(--border-medium);
-    background: var(--bg-card);
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.view-toggle button:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
-}
-.view-toggle button.active {
-    background: var(--accent-blue);
-    color: white;
-    border-color: var(--accent-blue);
-}
-
 /* Subcategory Styles */
 .subcategory-group {
     margin-left: 1.5rem;
@@ -698,16 +671,6 @@ tr.hidden {
     background: var(--bg-table-header);
     border-top: 2px solid var(--border-light);
 }
-.badge {
-    display: inline-block;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-.badge.avg { background: rgba(79, 172, 254, 0.2); color: var(--accent-blue); }
-.badge.div { background: rgba(240, 147, 251, 0.2); color: var(--accent-pink); }
-
 /* Tag badges in table */
 .tag-badge {
     display: inline-block;
