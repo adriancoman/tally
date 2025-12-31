@@ -58,10 +58,13 @@ EOF
 
 cat > config/settings.yaml << 'EOF'
 year: 2025
+
 data_sources:
   - name: TestBank
     file: data/transactions.csv
     format: "{date:%m/%d/%Y},{description},{amount}"
+
+sections_file: config/sections.sections
 EOF
 
 cat > config/merchant_categories.csv << 'EOF'
@@ -72,7 +75,7 @@ AMAZON,Amazon,Shopping,Online
 STARBUCKS,Starbucks,Food,Coffee
 EOF
 
-cat > config/sections.txt << 'EOF'
+cat > config/sections.sections << 'EOF'
 # Test sections file
 [Subscriptions]
 description: Monthly subscriptions
@@ -161,11 +164,11 @@ echo "=== Test 10: tally explain ==="
 tally explain Netflix
 echo "✓ Explain command works"
 
-# Test 11: Sections - verify sections.txt is loaded
+# Test 11: Sections - verify sections.sections is loaded
 echo ""
 echo "=== Test 11: tally sections ==="
 OUTPUT=$(tally diag 2>&1)
-if echo "$OUTPUT" | grep -qi "sections.txt\|Subscriptions\|High Frequency"; then
+if echo "$OUTPUT" | grep -qi "sections.sections\|Subscriptions\|High Frequency"; then
     echo "✓ Sections file detected in diag"
 else
     echo "Note: Sections info not in diag output (may be expected)"

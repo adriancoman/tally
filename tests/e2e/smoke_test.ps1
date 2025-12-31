@@ -51,10 +51,13 @@ Date,Description,Amount
 
     @"
 year: 2025
+
 data_sources:
   - name: TestBank
     file: data/transactions.csv
     format: "{date:%m/%d/%Y},{description},{amount}"
+
+sections_file: config/sections.sections
 "@ | Out-File -FilePath "config/settings.yaml" -Encoding utf8
 
     @"
@@ -78,7 +81,7 @@ filter: months >= 2
 [All Spending]
 description: Everything
 filter: total > 0
-"@ | Out-File -FilePath "config/sections.txt" -Encoding utf8
+"@ | Out-File -FilePath "config/sections.sections" -Encoding utf8
 
     Write-Host "✓ Test data created" -ForegroundColor Green
 
@@ -150,11 +153,11 @@ filter: total > 0
     tally explain Netflix
     Write-Host "✓ Explain command works" -ForegroundColor Green
 
-    # Test 11: Sections - verify sections.txt is loaded
+    # Test 11: Sections - verify sections.sections is loaded
     Write-Host ""
     Write-Host "=== Test 11: tally sections ===" -ForegroundColor Yellow
     $diagOutput = tally diag 2>&1 | Out-String
-    if ($diagOutput -match "sections.txt|Subscriptions|High Frequency") {
+    if ($diagOutput -match "sections.sections|Subscriptions|High Frequency") {
         Write-Host "✓ Sections file detected in diag" -ForegroundColor Green
     } else {
         Write-Host "Note: Sections info not in diag output (may be expected)" -ForegroundColor Yellow
