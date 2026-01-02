@@ -197,14 +197,17 @@ def cmd_reference(args):
         print(f"""
   These tags have special meaning in the spending report:
 
-  {C.CYAN}income{C.RESET}     Money coming in (salary, interest, deposits)
-             {C.DIM}→ Excluded from spending totals{C.RESET}
+  {C.CYAN}income{C.RESET}       Money coming in (salary, interest, deposits)
+               {C.DIM}→ Excluded from spending totals{C.RESET}
 
-  {C.CYAN}transfer{C.RESET}   Moving money between accounts (CC payments, transfers)
-             {C.DIM}→ Excluded from spending totals{C.RESET}
+  {C.CYAN}transfer{C.RESET}     Moving money between accounts (CC payments, transfers)
+               {C.DIM}→ Excluded from spending totals{C.RESET}
 
-  {C.CYAN}refund{C.RESET}     Returns and credits on purchases
-             {C.DIM}→ Shown in "Credits Applied" section, nets against spending{C.RESET}
+  {C.CYAN}investment{C.RESET}   Retirement contributions (401K, IRA, HSA)
+               {C.DIM}→ Tracked separately in Investment card and charts{C.RESET}
+
+  {C.CYAN}refund{C.RESET}       Returns and credits on purchases
+               {C.DIM}→ Shown in "Credits Applied" section, nets against spending{C.RESET}
 """)
 
         section("Dynamic Tags")
