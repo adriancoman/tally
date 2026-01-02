@@ -681,6 +681,113 @@ class TestEdgeCasesAndCalculations:
         # This confirms filtering affects calculations
         # The specific value depends on what merchant was clicked
 
+    # -------------------------------------------------------------------------
+    # Chart Aggregation Bug Tests
+    # -------------------------------------------------------------------------
+
+    def test_chart_aggregations_exclude_negative_amounts(self, page: Page, edge_case_report_path):
+        """Monthly spending chart should only include positive amounts.
+
+        Bug: chartAggregations sums ALL transaction amounts including negative ones
+        (refunds/credits), which incorrectly reduces the monthly spending totals.
+
+        Fixture data for January:
+        - Amazon: $200
+        - Amazon Refund: -$100 (should NOT be included in chart)
+        - Whole Foods: $300
+        - Starbucks: $50
+
+        Correct January total (positive only): $550
+        Buggy January total (all amounts): $450
+        """
+        page.goto(f"file://{edge_case_report_path}")
+        page.wait_for_timeout(500)  # Wait for Vue and Chart.js to initialize
+
+        # Access the Chart.js instance data from the monthly chart canvas
+        result = page.evaluate("""() => {
+            // Chart.js stores chart instance as a property on canvas
+            const canvas = document.querySelector('canvas');
+            if (!canvas) return { error: 'No canvas found' };
+
+            // Chart.js 3+ stores instance in Chart.instances or on element
+            const chartInstance = Chart.getChart(canvas);
+            if (!chartInstance) return { error: 'No chart instance found' };
+
+            // Get the data from the chart
+            const labels = chartInstance.data.labels;
+            const data = chartInstance.data.datasets[0].data;
+
+            // Return as object with month labels as keys
+            const byMonth = {};
+            labels.forEach((label, idx) => {
+                byMonth[label] = data[idx];
+            });
+            return { byMonth, labels, data };
+        }""")
+
+        if 'error' in result:
+            pytest.fail(f"Could not access chart data: {result['error']}")
+
+        # January should show $550 (positive amounts only), not $450 (with refund subtracted)
+        # The month label format is "Jan 2024"
+        january_total = result['byMonth'].get('Jan 2024', 0)
+
+        # This assertion documents the expected behavior after the fix:
+        # Only positive amounts should be included in the chart
+        # Fixture positive amounts in January: $200 (Amazon) + $300 (Whole Foods) + $50 (Starbucks) = $550
+        assert january_total == 550, (
+            f"January spending should be $550 (positive amounts only), "
+            f"but got ${january_total}. If this is $450, the bug is present "
+            f"(negative refund amount -$100 is being included). "
+            f"Chart data: {result}"
+        )
+
+    def test_chart_category_totals_exclude_negative_amounts(self, page: Page, edge_case_report_path):
+        """Category totals in chart should only include positive amounts.
+
+        Bug: chartAggregations.byCategory sums ALL transaction amounts including
+        negative ones, incorrectly reducing category totals in the pie/bar charts.
+
+        Fixture Refunds category total: -$150 (should NOT appear in chart data)
+        """
+        page.goto(f"file://{edge_case_report_path}")
+        page.wait_for_timeout(500)
+
+        # Access the category pie chart data
+        result = page.evaluate("""() => {
+            // Find the pie chart canvas (second canvas)
+            const canvases = document.querySelectorAll('canvas');
+            if (canvases.length < 2) return { error: 'Pie chart canvas not found' };
+
+            const pieCanvas = canvases[1];  // Pie chart is second
+            const chartInstance = Chart.getChart(pieCanvas);
+            if (!chartInstance) return { error: 'No pie chart instance found' };
+
+            // Get category labels and values
+            const labels = chartInstance.data.labels;
+            const data = chartInstance.data.datasets[0].data;
+
+            const byCategory = {};
+            labels.forEach((label, idx) => {
+                byCategory[label] = data[idx];
+            });
+            return { byCategory, labels, data };
+        }""")
+
+        if 'error' in result:
+            pytest.fail(f"Could not access pie chart data: {result['error']}")
+
+        by_category = result['byCategory']
+
+        # Refunds category should NOT be in chart data (all negative amounts)
+        # or if present, should have 0 value (not -150)
+        refunds_total = by_category.get('Refunds', 0)
+        assert refunds_total >= 0, (
+            f"Refunds category total should be 0 or not present in chart data, "
+            f"but got ${refunds_total}. Negative amounts should be excluded from charts. "
+            f"Chart data: {result}"
+        )
+
 
 # =============================================================================
 # Autocomplete Category/Subcategory Tests

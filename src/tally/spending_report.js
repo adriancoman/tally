@@ -825,6 +825,9 @@ createApp({
                 for (const subcat of Object.values(category.filteredSubcategories || {})) {
                     for (const merchant of Object.values(subcat.filteredMerchants || {})) {
                         for (const txn of merchant.filteredTxns || []) {
+                            // Skip negative amounts (credits/refunds) - only show spending in charts
+                            if (txn.amount <= 0) continue;
+
                             // By month
                             byMonth[txn.month] = (byMonth[txn.month] || 0) + txn.amount;
 
