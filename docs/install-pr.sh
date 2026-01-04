@@ -2,12 +2,70 @@
 set -e
 
 # Tally PR installer script
-# Usage: curl -fsSL https://raw.githubusercontent.com/davidfowl/tally/main/docs/install-pr.sh | bash -s -- <PR_NUMBER>
+# Usage: curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/docs/install-pr.sh | bash -s -- <PR_NUMBER>
 #
 # Requires: GitHub CLI (gh) installed and authenticated
 #   brew install gh && gh auth login
+#
+# The script automatically detects the repository from the download URL.
+# You can override by setting TALLY_REPO environment variable: TALLY_REPO=<owner>/<repo>
 
-REPO="davidfowl/tally"
+# Auto-detect repository from script URL or use environment variable
+# This allows the script to work with forks
+detect_repo() {
+    # Check if TALLY_REPO is explicitly set (allows override)
+    if [ -n "${TALLY_REPO:-}" ]; then
+        echo "$TALLY_REPO"
+        return
+    fi
+
+    # Try to detect from script URL when piped via curl
+    # Walk up the process tree to find the curl command with the URL
+    if command -v ps >/dev/null 2>&1; then
+        local pid=$PPID
+        local max_depth=5
+        local depth=0
+        
+        while [ $depth -lt $max_depth ] && [ -n "$pid" ] && [ "$pid" != "1" ]; do
+            local cmd
+            # Try different ps formats for different systems (macOS, Linux)
+            if [[ "$(uname -s)" == "Darwin" ]]; then
+                # macOS: use -ww for wide output to get full command line
+                cmd=$(ps -p "$pid" -ww -o command= 2>/dev/null || echo "")
+            else
+                # Linux: use -o args= or -o cmd=
+                cmd=$(ps -p "$pid" -o args= -o cmd= 2>/dev/null | head -1 || echo "")
+            fi
+            
+            if [ -n "$cmd" ]; then
+                # Look for raw.githubusercontent.com URL pattern
+                if [[ "$cmd" =~ raw\.githubusercontent\.com/([^/]+/[^/]+)/ ]]; then
+                    echo "${BASH_REMATCH[1]}"
+                    return
+                fi
+            fi
+            
+            # Move to parent process
+            pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ' || echo "")
+            depth=$((depth + 1))
+        done
+    fi
+
+    # Try to detect from git remote if in a git repository
+    if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+        local remote_url
+        remote_url=$(git config --get remote.origin.url 2>/dev/null || echo "")
+        if [[ "$remote_url" =~ github\.com[:/]([^/]+/[^/]+)\.git?$ ]] || [[ "$remote_url" =~ github\.com[:/]([^/]+/[^/]+)$ ]]; then
+            echo "${BASH_REMATCH[1]}"
+            return
+        fi
+    fi
+
+    # Default fallback
+    echo "davidfowl/tally"
+}
+
+REPO=$(detect_repo)
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.tally/bin}"
 TMPDIR="${TMPDIR:-/tmp}"
 
@@ -92,6 +150,13 @@ Example: $0 42"
     fi
 
     check_gh
+
+    # Show which repository is being used
+    if [ -n "${TALLY_REPO:-}" ]; then
+        info "Using repository from TALLY_REPO: ${REPO}"
+    else
+        info "Detected repository: ${REPO}"
+    fi
 
     info "Installing tally from PR #${pr_number}..."
 

@@ -1,9 +1,12 @@
 # Tally PR installer script for Windows
-# Usage: iex "& { $(irm https://raw.githubusercontent.com/davidfowl/tally/main/docs/install-pr.ps1) } <PR_NUMBER>"
+# Usage: iex "& { $(irm https://raw.githubusercontent.com/<owner>/<repo>/main/docs/install-pr.ps1) } <PR_NUMBER>"
 #
 # Requires: GitHub CLI (gh) installed and authenticated
 #   winget install GitHub.cli
 #   gh auth login
+#
+# The script automatically detects the repository from the download URL.
+# You can override by setting TALLY_REPO environment variable: $env:TALLY_REPO="<owner>/<repo>"
 
 param(
     [Parameter(Mandatory=$true, Position=0)]
@@ -12,7 +15,38 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$Repo = "davidfowl/tally"
+# Auto-detect repository from environment variable or download URL
+function Get-Repo {
+    # Check if TALLY_REPO is explicitly set (allows override)
+    if ($env:TALLY_REPO) {
+        return $env:TALLY_REPO
+    }
+
+    # Try to detect from PowerShell history or command line
+    # When invoked via IEX/IRM, the URL might be in the command history
+    $history = Get-History -Count 1 -ErrorAction SilentlyContinue
+    if ($history) {
+        $cmd = $history.CommandLine
+        if ($cmd -match 'raw\.githubusercontent\.com/([^/]+/[^/]+)/') {
+            return $matches[1]
+        }
+    }
+
+    # Try to detect from git remote if in a git repository
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        $remoteUrl = git config --get remote.origin.url 2>$null
+        if ($remoteUrl) {
+            if ($remoteUrl -match 'github\.com[:/]([^/]+/[^/]+)\.git?$' -or $remoteUrl -match 'github\.com[:/]([^/]+/[^/]+)$') {
+                return $matches[1]
+            }
+        }
+    }
+
+    # Default fallback
+    return "davidfowl/tally"
+}
+
+$Repo = Get-Repo
 $InstallDir = "$env:LOCALAPPDATA\tally"
 
 function Write-Info { param($msg) Write-Host "==> " -ForegroundColor Green -NoNewline; Write-Host $msg }
@@ -30,6 +64,13 @@ Then authenticate with: gh auth login"
 $authStatus = gh auth status 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Err "GitHub CLI is not authenticated. Run: gh auth login"
+}
+
+# Show which repository is being used
+if ($env:TALLY_REPO) {
+    Write-Info "Using repository from TALLY_REPO: $Repo"
+} else {
+    Write-Info "Detected repository: $Repo"
 }
 
 Write-Info "Installing tally from PR #$PRNumber..."

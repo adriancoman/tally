@@ -772,7 +772,7 @@ class TestCurrencyDetection:
 2025-01-16,Grocery,€45.50
 2025-01-17,Restaurant,50.00 lei"""
         
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as f:
             f.write(csv_content)
             temp_file = f.name
         
@@ -791,7 +791,7 @@ class TestCurrencyDetection:
         import os
         import csv
         
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=['Date', 'Description', 'Amount'])
             writer.writeheader()
             writer.writerow({'Date': '01/15/2025', 'Description': 'NETFLIX', 'Amount': '€15.99'})
@@ -812,7 +812,7 @@ class TestCurrencyDetection:
         boa_content = """01/15/2025  NETFLIX STREAMING     €15.99     1000.00
 01/16/2025  GROCERY STORE         50.00 lei   954.50"""
         
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
             f.write(boa_content)
             temp_file = f.name
         
@@ -854,7 +854,7 @@ class TestCurrencyDetection:
 2025-01-17,UK Store,£25.00
 2025-01-18,Romanian Store,50.00 lei"""
         
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as f:
             f.write(csv_content)
             temp_file = f.name
         
@@ -892,7 +892,7 @@ class TestCurrencyAutoDetection:
             csv_content = """date,description,amount
 2025-01-15,Netflix,€15.99
 2025-01-16,Grocery,€45.50"""
-            with open(os.path.join(data_dir, 'test.csv'), 'w') as f:
+            with open(os.path.join(data_dir, 'test.csv'), 'w', encoding='utf-8') as f:
                 f.write(csv_content)
             
             # Create settings.yaml with explicit currency_format (should override)
@@ -975,7 +975,7 @@ class TestCurrencyAutoDetection:
 2025-01-18,Store4,£25.00
 2025-01-19,Store5,$10.00"""
         
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as f:
             f.write(csv_content)
             temp_file = f.name
         
@@ -1050,7 +1050,7 @@ class TestCurrencyAutoDetection:
 2025-01-15,Netflix,50.00 lei
 2025-01-16,Grocery,150.50 lei
 2025-01-17,Restaurant,100.00 lei"""
-            with open(os.path.join(data_dir, 'test.csv'), 'w') as f:
+            with open(os.path.join(data_dir, 'test.csv'), 'w', encoding='utf-8') as f:
                 f.write(csv_content)
             
             # Create settings.yaml with Euro format (different from data)
