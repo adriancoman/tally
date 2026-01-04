@@ -143,9 +143,14 @@ def cmd_run(args):
     # Analyze
     stats = analyze_transactions(all_txns)
 
-    # Detect currency from input data if not already configured
+    # Currency format: use settings.yaml if configured, otherwise auto-detect from data
     currency_format = config.get('currency_format')
-    if not currency_format:
+    if currency_format:
+        # Explicitly configured in settings.yaml - use it (overrides auto-detection)
+        if not args.quiet:
+            print(f"Using currency format from settings.yaml: {currency_format}")
+    else:
+        # Not configured - auto-detect from transaction data
         from collections import Counter
         from ..parsers import detect_currencies_from_file, currency_to_format
         
@@ -178,10 +183,12 @@ def cmd_run(args):
             currency_format = currency_to_format(most_common_currency)
             
             if not args.quiet:
-                print(f"Detected currency: {most_common_currency} (from {len(all_detected_currencies)} transactions)")
+                print(f"Auto-detected currency: {most_common_currency} (from {len(all_detected_currencies)} transactions)")
         else:
-            # Default to USD if no currency detected
+            # Default to USD if no currency detected and not configured
             currency_format = '${amount}'
+            if not args.quiet:
+                print("No currency detected in data, defaulting to USD")
 
     # Classify by user-defined views
     views_config = config.get('sections')

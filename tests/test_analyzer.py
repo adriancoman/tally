@@ -869,6 +869,236 @@ class TestCurrencyDetection:
             os.unlink(temp_file)
 
 
+class TestCurrencyAutoDetection:
+    """Tests for automatic currency detection and settings.yaml override."""
+
+    def test_currency_format_in_settings_overrides_detection(self):
+        """Test that currency_format in settings.yaml overrides auto-detection."""
+        import tempfile
+        import os
+        import yaml
+        from tally.config_loader import load_config
+        from tally.parsers import detect_currencies_from_file, currency_to_format
+        from tally.format_parser import parse_format_string
+        
+        # Create test directory structure
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = os.path.join(tmpdir, 'config')
+            data_dir = os.path.join(tmpdir, 'data')
+            os.makedirs(config_dir)
+            os.makedirs(data_dir)
+            
+            # Create CSV with Euro currency (different from settings)
+            csv_content = """date,description,amount
+2025-01-15,Netflix,€15.99
+2025-01-16,Grocery,€45.50"""
+            with open(os.path.join(data_dir, 'test.csv'), 'w') as f:
+                f.write(csv_content)
+            
+            # Create settings.yaml with explicit currency_format (should override)
+            settings = {
+                'year': 2025,
+                'currency_format': '£{amount}',  # Explicitly set to GBP (different from data)
+                'data_sources': [{
+                    'name': 'Test',
+                    'file': 'data/test.csv',
+                    'format': '{date:%Y-%m-%d},{description},{amount}'
+                }]
+            }
+            with open(os.path.join(config_dir, 'settings.yaml'), 'w') as f:
+                yaml.dump(settings, f)
+            
+            # Load config and verify currency_format is set
+            config = load_config(config_dir)
+            assert config.get('currency_format') == '£{amount}'
+            
+            # Verify that data actually contains Euro (different currency)
+            format_spec = parse_format_string('{date:%Y-%m-%d},{description},{amount}')
+            csv_file = os.path.join(data_dir, 'test.csv')
+            detected_currencies = detect_currencies_from_file(csv_file, format_spec, 'generic', '.')
+            assert '€' in detected_currencies
+            assert '£' not in detected_currencies  # Data has Euro, not GBP
+            
+            # Verify that if we were to auto-detect, we'd get Euro
+            # But since currency_format is set, it should override
+            if detected_currencies:
+                auto_detected_format = currency_to_format(detected_currencies[0])
+                assert auto_detected_format == '€{amount}'  # Auto-detection would give Euro
+            
+            # But config should still have GBP (the override)
+            assert config.get('currency_format') == '£{amount}'
+
+    def test_no_currency_format_triggers_auto_detection(self):
+        """Test that missing currency_format triggers auto-detection."""
+        import tempfile
+        import os
+        import yaml
+        from tally.config_loader import load_config
+        
+        # Create test directory structure
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = os.path.join(tmpdir, 'config')
+            data_dir = os.path.join(tmpdir, 'data')
+            os.makedirs(config_dir)
+            os.makedirs(data_dir)
+            
+            # Create settings.yaml WITHOUT currency_format
+            settings = {
+                'year': 2025,
+                # currency_format is NOT set - should trigger auto-detection
+                'data_sources': [{
+                    'name': 'Test',
+                    'file': 'data/test.csv',
+                    'format': '{date:%Y-%m-%d},{description},{amount}'
+                }]
+            }
+            with open(os.path.join(config_dir, 'settings.yaml'), 'w') as f:
+                yaml.dump(settings, f)
+            
+            # Load config and verify currency_format is not set
+            config = load_config(config_dir)
+            assert 'currency_format' not in config or config.get('currency_format') is None
+
+    def test_auto_detection_uses_most_common_currency(self):
+        """Test that auto-detection selects the most common currency."""
+        import tempfile
+        import os
+        from collections import Counter
+        from tally.parsers import detect_currencies_from_file, currency_to_format
+        from tally.format_parser import parse_format_string
+        
+        # Create CSV with mixed currencies (more Euro than others)
+        csv_content = """date,description,amount
+2025-01-15,Store1,€15.99
+2025-01-16,Store2,€45.50
+2025-01-17,Store3,€32.00
+2025-01-18,Store4,£25.00
+2025-01-19,Store5,$10.00"""
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_file = f.name
+        
+        try:
+            format_spec = parse_format_string('{date:%Y-%m-%d},{description},{amount}')
+            currencies = detect_currencies_from_file(temp_file, format_spec, 'generic', '.')
+            
+            # Euro should be most common (3 occurrences)
+            currency_counter = Counter(currencies)
+            most_common = currency_counter.most_common(1)[0][0]
+            assert most_common == '€'
+            assert currency_counter['€'] == 3
+            assert currency_counter['£'] == 1
+            assert currency_counter['$'] == 1
+            
+            # Verify format mapping
+            format_str = currency_to_format(most_common)
+            assert format_str == '€{amount}'
+        finally:
+            os.unlink(temp_file)
+
+    def test_auto_detection_defaults_to_usd_when_no_currency_found(self):
+        """Test that auto-detection defaults to USD when no currency is detected."""
+        import tempfile
+        import os
+        from tally.parsers import detect_currencies_from_file, currency_to_format
+        from tally.format_parser import parse_format_string
+        
+        # Create CSV with no currency symbols
+        csv_content = """date,description,amount
+2025-01-15,Store1,15.99
+2025-01-16,Store2,45.50
+2025-01-17,Store3,32.00"""
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_file = f.name
+        
+        try:
+            format_spec = parse_format_string('{date:%Y-%m-%d},{description},{amount}')
+            currencies = detect_currencies_from_file(temp_file, format_spec, 'generic', '.')
+            
+            # No currencies should be detected
+            assert currencies == []
+            
+            # Should default to USD
+            default_format = currency_to_format(None)
+            assert default_format == '${amount}'
+        finally:
+            os.unlink(temp_file)
+
+    def test_currency_override_integration(self):
+        """Integration test: settings.yaml currency_format overrides detected currency in full flow."""
+        import tempfile
+        import os
+        import yaml
+        from tally.config_loader import load_config
+        from tally.parsers import parse_generic_csv, detect_currencies_from_file
+        from tally.format_parser import parse_format_string
+        from tally.merchant_utils import get_all_rules
+        from tally.analyzer import analyze_transactions
+        from tally.report import format_currency
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = os.path.join(tmpdir, 'config')
+            data_dir = os.path.join(tmpdir, 'data')
+            os.makedirs(config_dir)
+            os.makedirs(data_dir)
+            
+            # Create CSV with Romanian Leu
+            csv_content = """date,description,amount
+2025-01-15,Netflix,50.00 lei
+2025-01-16,Grocery,150.50 lei
+2025-01-17,Restaurant,100.00 lei"""
+            with open(os.path.join(data_dir, 'test.csv'), 'w') as f:
+                f.write(csv_content)
+            
+            # Create settings.yaml with Euro format (different from data)
+            settings = {
+                'year': 2025,
+                'currency_format': '€{amount}',  # Override: use Euro even though data has lei
+                'data_sources': [{
+                    'name': 'Test',
+                    'file': 'data/test.csv',
+                    'format': '{date:%Y-%m-%d},{description},{amount}'
+                }]
+            }
+            with open(os.path.join(config_dir, 'settings.yaml'), 'w') as f:
+                yaml.dump(settings, f)
+            
+            # Create empty merchants.rules
+            with open(os.path.join(config_dir, 'merchants.rules'), 'w') as f:
+                f.write('')
+            
+            # Load config
+            config = load_config(config_dir)
+            currency_format = config.get('currency_format')
+            
+            # Verify override is set
+            assert currency_format == '€{amount}'
+            
+            # Verify data actually has Romanian Leu (not Euro)
+            format_spec = parse_format_string('{date:%Y-%m-%d},{description},{amount}')
+            csv_file = os.path.join(data_dir, 'test.csv')
+            detected_currencies = detect_currencies_from_file(csv_file, format_spec, 'generic', '.')
+            assert 'lei' in detected_currencies
+            assert '€' not in detected_currencies
+            
+            # Parse transactions and analyze
+            rules = get_all_rules()
+            txns = parse_generic_csv(csv_file, format_spec, rules)
+            stats = analyze_transactions(txns)
+            
+            # Format using the currency_format from config (should be Euro, not lei)
+            total = stats.get('spending_total', 0)
+            formatted = format_currency(total, currency_format)
+            
+            # Should use Euro format (from settings.yaml), not lei (from data)
+            assert '€' in formatted
+            assert 'lei' not in formatted
+            assert currency_format == '€{amount}'
+
+
 class TestRegexDelimiter:
     """Tests for regex-based delimiter parsing (for fixed-width formats like BOA)."""
 
