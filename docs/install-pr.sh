@@ -2,13 +2,20 @@
 set -e
 
 # Tally PR installer script
-# Usage: curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/docs/install-pr.sh | bash -s -- <PR_NUMBER>
+# Usage: curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/docs/install-pr.sh | bash -s -- <PR_NUMBER> [REPO]
+#
+# Examples:
+#   curl -fsSL https://raw.githubusercontent.com/adriancoman/tally/main/docs/install-pr.sh | bash -s -- 1
+#   curl ... | bash -s -- 1 adriancoman/tally
+#   TALLY_REPO=adriancoman/tally curl ... | bash -s -- 1
 #
 # Requires: GitHub CLI (gh) installed and authenticated
 #   brew install gh && gh auth login
 #
-# The script automatically detects the repository from the download URL.
-# You can override by setting TALLY_REPO environment variable: TALLY_REPO=<owner>/<repo>
+# The script attempts to auto-detect the repository from the download URL.
+# If auto-detection fails, you can override by:
+#   - Setting TALLY_REPO environment variable
+#   - Passing the repo as the second argument
 
 # Auto-detect repository from script URL or use environment variable
 # This allows the script to work with forks
@@ -20,8 +27,40 @@ detect_repo() {
     fi
 
     # Try to detect from script URL when piped via curl
-    # Walk up the process tree to find the curl command with the URL
+    # This is challenging because curl may finish before the script runs
+    # We'll try multiple methods:
+    
+    # Method 1: Check shell history (if available and enabled)
+    if [ -n "${HISTFILE:-}" ] && [ -r "${HISTFILE:-}" ]; then
+        local hist_line
+        hist_line=$(tail -5 "$HISTFILE" 2>/dev/null | grep -E 'raw\.githubusercontent\.com' | tail -1 || echo "")
+        if [ -n "$hist_line" ] && [[ "$hist_line" =~ raw\.githubusercontent\.com/([^/]+/[^/]+)/ ]]; then
+            echo "${BASH_REMATCH[1]}"
+            return
+        fi
+    fi
+    
+    # Method 2: Check all curl processes for the URL pattern (curl might still be running)
     if command -v ps >/dev/null 2>&1; then
+        local curl_procs
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            # macOS: check all processes, use -ww for wide output
+            curl_procs=$(ps -A -ww -o pid= -o command= 2>/dev/null | grep -i curl || echo "")
+        else
+            # Linux: check all processes
+            curl_procs=$(ps -A -o pid= -o args= 2>/dev/null | grep -i curl || echo "")
+        fi
+        
+        if [ -n "$curl_procs" ]; then
+            while IFS= read -r line; do
+                if [[ "$line" =~ raw\.githubusercontent\.com/([^/]+/[^/]+)/ ]]; then
+                    echo "${BASH_REMATCH[1]}"
+                    return
+                fi
+            done <<< "$curl_procs"
+        fi
+        
+        # Method 3: Walk up the process tree to find the curl command with the URL
         local pid=$PPID
         local max_depth=5
         local depth=0
@@ -65,7 +104,6 @@ detect_repo() {
     echo "davidfowl/tally"
 }
 
-REPO=$(detect_repo)
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.tally/bin}"
 TMPDIR="${TMPDIR:-/tmp}"
 
@@ -115,11 +153,12 @@ detect_arch() {
 
 # Get the latest successful workflow run for a PR
 get_workflow_run_id() {
-    local pr_number="$1"
+    local repo="$1"
+    local pr_number="$2"
 
     # Get the head SHA of the PR
     local head_sha
-    head_sha=$(gh api "repos/${REPO}/pulls/${pr_number}" --jq '.head.sha')
+    head_sha=$(gh api "repos/${repo}/pulls/${pr_number}" --jq '.head.sha')
 
     if [ -z "$head_sha" ]; then
         error "Could not find PR #${pr_number}"
@@ -129,12 +168,12 @@ get_workflow_run_id() {
 
     # Find the latest successful workflow run for this commit
     local run_id
-    run_id=$(gh api "repos/${REPO}/actions/workflows/pr-build.yml/runs?head_sha=${head_sha}&status=success" \
+    run_id=$(gh api "repos/${repo}/actions/workflows/pr-build.yml/runs?head_sha=${head_sha}&status=success" \
         --jq '.workflow_runs[0].id')
 
     if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
         error "No successful build found for PR #${pr_number}.
-Check https://github.com/${REPO}/pull/${pr_number}/checks"
+Check https://github.com/${repo}/pull/${pr_number}/checks"
     fi
 
     echo "$run_id"
@@ -142,20 +181,42 @@ Check https://github.com/${REPO}/pull/${pr_number}/checks"
 
 main() {
     local pr_number="$1"
+    local repo_override="$2"
 
     if [ -z "$pr_number" ]; then
-        error "Usage: $0 <PR_NUMBER>
+        error "Usage: $0 <PR_NUMBER> [REPO]
 
-Example: $0 42"
+Example: $0 42
+Example: $0 42 adriancoman/tally
+
+The repository will be auto-detected from the download URL when possible.
+You can also set TALLY_REPO environment variable or pass it as the second argument."
+    fi
+
+    # Determine repository: argument > env var > auto-detect > default
+    local REPO
+    if [ -n "$repo_override" ]; then
+        REPO="$repo_override"
+    elif [ -n "${TALLY_REPO:-}" ]; then
+        REPO="${TALLY_REPO}"
+    else
+        REPO=$(detect_repo)
     fi
 
     check_gh
 
     # Show which repository is being used
-    if [ -n "${TALLY_REPO:-}" ]; then
+    if [ -n "$repo_override" ]; then
+        info "Using repository from argument: ${REPO}"
+    elif [ -n "${TALLY_REPO:-}" ]; then
         info "Using repository from TALLY_REPO: ${REPO}"
+    elif [[ "$REPO" != "davidfowl/tally" ]]; then
+        info "Auto-detected repository: ${REPO}"
     else
-        info "Detected repository: ${REPO}"
+        warn "Could not auto-detect repository, using default: ${REPO}"
+        warn "If this is wrong, set TALLY_REPO or pass repo as second argument:"
+        warn "  TALLY_REPO=adriancoman/tally curl ... | bash -s -- $pr_number"
+        warn "  curl ... | bash -s -- $pr_number adriancoman/tally"
     fi
 
     info "Installing tally from PR #${pr_number}..."
@@ -167,7 +228,7 @@ Example: $0 42"
     info "Detected: ${PLATFORM}"
 
     # Get workflow run ID
-    RUN_ID=$(get_workflow_run_id "$pr_number")
+    RUN_ID=$(get_workflow_run_id "$REPO" "$pr_number")
     info "Found workflow run: ${RUN_ID}"
 
     # Download artifact
