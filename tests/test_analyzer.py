@@ -9,6 +9,7 @@ from datetime import date
 from tally.analyzer import parse_amount, parse_generic_csv, analyze_transactions, export_json
 from tally.format_parser import parse_format_string
 from tally.merchant_utils import get_all_rules
+from tally.parsers import detect_currency, currency_to_format, detect_currencies_from_file
 
 
 class TestExportJson:
@@ -697,6 +698,175 @@ class TestCurrencyFormatting:
         from tally.analyzer import format_currency
         assert format_currency(-1234) == "$-1,234"
         assert format_currency(-1234, "{amount} zł") == "-1,234 zł"
+
+
+class TestCurrencyDetection:
+    """Tests for currency detection functions."""
+
+    def test_detect_currency_symbols(self):
+        """Test detection of currency symbols (prefix)."""
+        assert detect_currency('$123.45') == '$'
+        assert detect_currency('€100.00') == '€'
+        assert detect_currency('£50.00') == '£'
+        assert detect_currency('¥1000') == '¥'
+        assert detect_currency('123.45') is None  # No currency
+
+    def test_detect_currency_codes(self):
+        """Test detection of currency codes."""
+        assert detect_currency('USD 100.00') == 'USD'
+        assert detect_currency('EUR 50.00') == 'EUR'
+        assert detect_currency('GBP 25.00') == 'GBP'
+        assert detect_currency('JPY 1000') == 'JPY'
+        assert detect_currency('RON 100.00') == 'RON'
+
+    def test_detect_currency_suffixes(self):
+        """Test detection of currency suffixes."""
+        assert detect_currency('100.00 lei') == 'lei'
+        assert detect_currency('50.00 leu') == 'lei'  # Singular maps to plural
+        assert detect_currency('100.00 kr') == 'kr'
+        assert detect_currency('50.00 zł') == 'zł'
+
+    def test_detect_currency_case_insensitive(self):
+        """Test that currency detection is case-insensitive."""
+        assert detect_currency('eur 100.00') == 'EUR'
+        assert detect_currency('EUR 100.00') == 'EUR'
+        assert detect_currency('Eur 100.00') == 'EUR'
+        assert detect_currency('RON 100.00') == 'RON'
+        assert detect_currency('ron 100.00') == 'RON'
+
+    def test_detect_currency_with_whitespace(self):
+        """Test currency detection with various whitespace."""
+        assert detect_currency('  €100.00  ') == '€'
+        assert detect_currency('100.00  lei  ') == 'lei'
+        assert detect_currency('EUR  100.00') == 'EUR'
+
+    def test_currency_to_format_mapping(self):
+        """Test mapping of currency symbols to format strings."""
+        assert currency_to_format('$') == '${amount}'
+        assert currency_to_format('USD') == '${amount}'
+        assert currency_to_format('€') == '€{amount}'
+        assert currency_to_format('EUR') == '€{amount}'
+        assert currency_to_format('£') == '£{amount}'
+        assert currency_to_format('GBP') == '£{amount}'
+        assert currency_to_format('¥') == '¥{amount}'
+        assert currency_to_format('JPY') == '¥{amount}'
+        assert currency_to_format('lei') == '{amount} lei'
+        assert currency_to_format('RON') == '{amount} lei'
+        assert currency_to_format('kr') == '{amount} kr'
+        assert currency_to_format('zł') == '{amount} zł'
+        assert currency_to_format('PLN') == '{amount} zł'
+
+    def test_currency_to_format_unknown_defaults_to_usd(self):
+        """Test that unknown currencies default to USD format."""
+        assert currency_to_format('XYZ') == '${amount}'
+        assert currency_to_format('') == '${amount}'
+        assert currency_to_format(None) == '${amount}'
+
+    def test_detect_currencies_from_file_generic_csv(self):
+        """Test currency detection from generic CSV file."""
+        import tempfile
+        import os
+        
+        csv_content = """date,description,amount
+2025-01-15,Netflix,€15.99
+2025-01-16,Grocery,€45.50
+2025-01-17,Restaurant,50.00 lei"""
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_file = f.name
+        
+        try:
+            format_spec = parse_format_string('{date:%Y-%m-%d},{description},{amount}')
+            currencies = detect_currencies_from_file(temp_file, format_spec, 'generic', '.')
+            assert '€' in currencies
+            assert 'lei' in currencies
+            assert len(currencies) == 3  # Two €, one lei
+        finally:
+            os.unlink(temp_file)
+
+    def test_detect_currencies_from_file_amex(self):
+        """Test currency detection from AMEX CSV file."""
+        import tempfile
+        import os
+        import csv
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            writer = csv.DictWriter(f, fieldnames=['Date', 'Description', 'Amount'])
+            writer.writeheader()
+            writer.writerow({'Date': '01/15/2025', 'Description': 'NETFLIX', 'Amount': '€15.99'})
+            writer.writerow({'Date': '01/16/2025', 'Description': 'GROCERY', 'Amount': '€45.50'})
+            temp_file = f.name
+        
+        try:
+            currencies = detect_currencies_from_file(temp_file, None, 'amex', '.')
+            assert currencies == ['€', '€']
+        finally:
+            os.unlink(temp_file)
+
+    def test_detect_currencies_from_file_boa(self):
+        """Test currency detection from BOA statement file."""
+        import tempfile
+        import os
+        
+        boa_content = """01/15/2025  NETFLIX STREAMING     €15.99     1000.00
+01/16/2025  GROCERY STORE         50.00 lei   954.50"""
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write(boa_content)
+            temp_file = f.name
+        
+        try:
+            currencies = detect_currencies_from_file(temp_file, None, 'boa', '.')
+            assert '€' in currencies
+            assert 'lei' in currencies
+        finally:
+            os.unlink(temp_file)
+
+    def test_detect_currencies_from_file_no_currency(self):
+        """Test currency detection when no currency symbols are present."""
+        import tempfile
+        import os
+        
+        csv_content = """date,description,amount
+2025-01-15,Netflix,15.99
+2025-01-16,Grocery,45.50"""
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_file = f.name
+        
+        try:
+            format_spec = parse_format_string('{date:%Y-%m-%d},{description},{amount}')
+            currencies = detect_currencies_from_file(temp_file, format_spec, 'generic', '.')
+            assert currencies == []
+        finally:
+            os.unlink(temp_file)
+
+    def test_detect_currencies_from_file_mixed_currencies(self):
+        """Test detection when file contains multiple currencies."""
+        import tempfile
+        import os
+        
+        csv_content = """date,description,amount
+2025-01-15,US Store,$15.99
+2025-01-16,European Store,€45.50
+2025-01-17,UK Store,£25.00
+2025-01-18,Romanian Store,50.00 lei"""
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_file = f.name
+        
+        try:
+            format_spec = parse_format_string('{date:%Y-%m-%d},{description},{amount}')
+            currencies = detect_currencies_from_file(temp_file, format_spec, 'generic', '.')
+            assert '$' in currencies
+            assert '€' in currencies
+            assert '£' in currencies
+            assert 'lei' in currencies
+        finally:
+            os.unlink(temp_file)
 
 
 class TestRegexDelimiter:
